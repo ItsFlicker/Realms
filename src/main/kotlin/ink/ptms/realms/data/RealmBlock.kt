@@ -108,7 +108,7 @@ class RealmBlock(center: Location, var size: Int) {
                     override fun spawn(location: taboolib.common.util.Location) {
                         ProxyParticle.END_ROD.sendTo(location, range = 50.0, offset = Vector(0, 0, 0), count = 1)
                     }
-            })
+            }).show()
         }
     }
 

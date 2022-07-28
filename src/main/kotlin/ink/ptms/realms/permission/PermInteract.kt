@@ -11,8 +11,6 @@ import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.inventory.ItemStack
 import taboolib.common.LifeCycle
 import taboolib.common.platform.Awake
-import taboolib.common.platform.Platform
-import taboolib.common.platform.PlatformSide
 import taboolib.common.platform.event.SubscribeEvent
 import taboolib.library.xseries.XMaterial
 import taboolib.platform.util.buildItem
@@ -24,7 +22,7 @@ import taboolib.platform.util.buildItem
  * @author sky
  * @since 2021/3/18 9:20 上午
  */
-@PlatformSide([Platform.BUKKIT])
+
 object PermInteract : Permission {
 
     @Awake(LifeCycle.INIT)
@@ -47,8 +45,7 @@ object PermInteract : Permission {
             lore += listOf(
                 "",
                 "§7允许行为:",
-                "§8方块交互, 实体交互",
-                "§8粘液科技机器交互"
+                "§8方块交互, 实体交互"
             )
             if (value) shiny()
         }

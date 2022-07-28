@@ -12,7 +12,7 @@ taboolib {
             name("枫溪")
         }
         dependencies {
-            name("Blockdb")
+            name("Adyeshach")
         }
     }
     install("common", "common-5")
@@ -26,7 +26,6 @@ taboolib {
         "module-ui"
     )
     install("platform-bukkit")
-    relocate("ink.ptms.blockdb", "ink.ptms.realms.library.blockdb")
     classifier = null
     version = "6.0.9-39"
 }
@@ -37,7 +36,7 @@ repositories {
 }
 
 dependencies {
-    compileOnly("ink.ptms:Blockdb:1.1.0")
+    compileOnly("ink.ptms:Adyeshach:1.5.7")
 
     compileOnly("ink.ptms.core:v11604:11604")
     compileOnly("ink.ptms.core:v11900:11900:mapped")

@@ -23,15 +23,14 @@ import taboolib.platform.util.isAir
 object RealmCommand {
 
     @CommandBody(permission = "admin")
-    val setRealmSize = subCommand {
+    val setrealmsize = subCommand {
         dynamic {
             restrict<Player> { _, _, argument ->
                 Coerce.asInteger(argument).isPresent
             }
             execute<Player> { sender, _, argument ->
                 if (sender.inventory.itemInMainHand.isAir()) {
-                    sender.sendMessage("你无法给空气设置领域大小。")
-                    return@execute
+                    return@execute sender.sendMessage("你无法给空气设置领域大小。")
                 }
                 sender.inventory.itemInMainHand.setRealmSize(Coerce.toInteger(argument))
                 sender.sendMessage("当前手中物品的领域大小为${sender.inventory.itemInMainHand.getRealmSize()}格。")
@@ -42,10 +41,8 @@ object RealmCommand {
     @CommandBody
     val show = subCommand {
         execute<Player> { sender, _, _ ->
-            sender.location.getRealm()?.run {
-                submit(async = true) {
-                    borderDisplay()
-                }
+            submit(async = true) {
+                sender.location.getRealm()?.borderDisplay()
             }
         }
     }

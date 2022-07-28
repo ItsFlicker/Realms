@@ -11,8 +11,9 @@ object PapiHook : PlaceholderExpansion {
 
     override fun onPlaceholderRequest(player: Player?, args: String): String {
         player ?: return "ERROR"
-        return when (args) {
-            "where" -> RealmManager.getRealmBlock(player.location)?.name ?: "野外"
+        val params = args.split("_")
+        return when (params[0]) {
+            "where" -> RealmManager.getRealmBlock(player.location)?.name ?: params.getOrElse(1) { "野外" }
             else -> "null"
         }
     }

@@ -1,6 +1,5 @@
 package ink.ptms.realms.util
 
-import org.bukkit.World
 import org.bukkit.entity.Player
 import taboolib.common.platform.function.adaptPlayer
 import taboolib.common.util.Location
@@ -19,57 +18,28 @@ fun Location.toAABB(size: Int) = BoundingBox(
 )
 
 fun BoundingBox.getVertex(): List<Vector> {
-    val vertex = mutableListOf<Vector>()
+    val vertex = mutableSetOf<Vector>()
     Line(
         Location(null, minX, minY, maxZ),
         Location(null, maxX, maxY, minZ),
         1.0,
         object : ParticleSpawner {
             override fun spawn(location: Location) {
-                vertex.add(Vector())
+                vertex.add(Vector(location.x, location.y, location.z))
             }
         }
-    )
+    ).show()
     Line(
         Location(null, maxX, minY, minZ),
         Location(null, minX, maxY, maxZ),
         1.0,
         object : ParticleSpawner {
             override fun spawn(location: Location) {
-                vertex.add(Vector())
+                vertex.add(Vector(location.x, location.y, location.z))
             }
         }
-    )
+    ).show()
     return vertex.toList()
-//    return listOf(
-//        Vector(minX, minY, minZ),
-//        Vector(maxX, minY, minZ),
-//        Vector(maxX, minY, maxZ),
-//        Vector(minX, minY, maxZ),
-//        Vector(minX, maxY, minZ),
-//        Vector(maxX, maxY, minZ),
-//        Vector(maxX, maxY, maxZ),
-//        Vector(minX, maxY, maxZ),
-//        Vector(minX, (maxY+minY)/2, minZ),
-//        Vector(maxX, (maxY+minY)/2, minZ),
-//        Vector(maxX, (maxY+minY)/2, maxZ),
-//        Vector(minX, (maxY+minY)/2, maxZ),
-//        Vector((maxX+minX)/2, minY, (maxZ+minZ)/2),
-//        Vector((maxX+minX)/2, maxY, (maxZ+minZ)/2),
-//        Vector((maxX+minX)/2, (maxY+minY)/2, (maxZ+minZ)/2)
-//    )
-}
-
-fun BoundingBox.getBlocksWithinBB(world: World): MutableList<Location> {
-    val blocklist = mutableListOf<Location>()
-    for (x in minX.toInt()..maxX.toInt()) {
-        for (y in minY.toInt()..maxY.toInt()) {
-            for (z in minZ.toInt()..maxZ.toInt()) {
-                blocklist.add(Location(world.name, x.toDouble(), y.toDouble(), z.toDouble()))
-            }
-        }
-    }
-    return blocklist
 }
 
 val Boolean.display: String

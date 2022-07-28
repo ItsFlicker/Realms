@@ -1,8 +1,8 @@
 realms-dust:
   material: blue_dye
-  name: '&b领域之尘'
+  name: '§b领域之尘'
   lore:
-    - '&7可兑换完整领域'
+    - '§7可兑换完整领域'
   flags:
     - HIDE_ENCHANTS
   enchant:

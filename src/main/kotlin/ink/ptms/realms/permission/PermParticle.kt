@@ -29,7 +29,7 @@ object PermParticle : Permission {
         get() = -1
 
     override val default: Boolean
-        get() = false
+        get() = true
 
     override val worldSide: Boolean
         get() = true

@@ -9,8 +9,6 @@ import ink.ptms.realms.util.warning
 import org.bukkit.inventory.ItemStack
 import taboolib.common.LifeCycle
 import taboolib.common.platform.Awake
-import taboolib.common.platform.Platform
-import taboolib.common.platform.PlatformSide
 import taboolib.common.platform.event.SubscribeEvent
 import taboolib.library.xseries.XMaterial
 import taboolib.platform.util.buildItem
@@ -21,7 +19,7 @@ import taboolib.platform.util.buildItem
  * @author 枫溪
  * @since 2021/4/18 8:30 上午
  */
-@PlatformSide([Platform.BUKKIT])
+
 object PermJoin : Permission {
 
     @Awake(LifeCycle.INIT)

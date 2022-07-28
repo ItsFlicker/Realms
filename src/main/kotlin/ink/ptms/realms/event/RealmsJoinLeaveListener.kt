@@ -12,11 +12,11 @@ object RealmsJoinLeaveListener {
             val from = event.from.getRealm()
             val to = event.to.getRealm()
             if (from != to) {
-                RealmsJoinEvent(event.player, to, from).call().let {
-                    if (!it) event.to = event.from
+                if (!RealmsJoinEvent(event.player, to, from).call()) {
+                    event.to = event.from
                 }
-                RealmsLeaveEvent(event.player, from, to).call().let {
-                    if (!it) event.from = event.to
+                if (!RealmsLeaveEvent(event.player, from, to).call()) {
+                    event.from = event.to
                 }
             }
         }

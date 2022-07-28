@@ -9,8 +9,6 @@ import org.bukkit.event.player.PlayerTeleportEvent
 import org.bukkit.inventory.ItemStack
 import taboolib.common.LifeCycle
 import taboolib.common.platform.Awake
-import taboolib.common.platform.Platform
-import taboolib.common.platform.PlatformSide
 import taboolib.common.platform.event.SubscribeEvent
 import taboolib.library.xseries.XMaterial
 import taboolib.platform.util.buildItem
@@ -22,7 +20,7 @@ import taboolib.platform.util.buildItem
  * @author sky
  * @since 2021/3/18 9:20 上午
  */
-@PlatformSide([Platform.BUKKIT])
+
 object PermTeleport : Permission {
 
     @Awake(LifeCycle.INIT)

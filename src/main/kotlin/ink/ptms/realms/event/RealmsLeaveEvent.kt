@@ -7,5 +7,5 @@ import taboolib.common.platform.event.ProxyEvent
 class RealmsLeaveEvent(
     val player: Player,
     val realmBlock: RealmBlock?,
-    val oldRealmBlock: RealmBlock?,
+    val previousRealmBlock: RealmBlock?,
 ) : ProxyEvent()
