@@ -22,7 +22,6 @@ import taboolib.platform.util.buildItem
  * @author sky
  * @since 2021/3/18 9:20 上午
  */
-
 object PermItem : Permission {
 
     @Awake(LifeCycle.INIT)

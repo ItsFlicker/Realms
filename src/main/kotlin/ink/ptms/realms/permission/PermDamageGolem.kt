@@ -6,7 +6,9 @@ import ink.ptms.realms.RealmManager.register
 import ink.ptms.realms.util.display
 import ink.ptms.realms.util.warning
 import org.bukkit.entity.Golem
+import org.bukkit.entity.IronGolem
 import org.bukkit.entity.Player
+import org.bukkit.entity.Snowman
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.inventory.ItemStack
 import taboolib.common.LifeCycle
@@ -22,7 +24,6 @@ import taboolib.platform.util.buildItem
  * @author sky
  * @since 2021/3/18 9:20 上午
  */
-
 object PermDamageGolem : Permission {
 
     @Awake(LifeCycle.INIT)
@@ -45,7 +46,7 @@ object PermDamageGolem : Permission {
             lore += listOf(
                 "",
                 "§7允许行为:",
-                "§8对傀儡 (Golem) 造成伤害"
+                "§8对傀儡 (IronGolem,Snowman) 造成伤害"
             )
             if (value) shiny()
         }
@@ -53,7 +54,7 @@ object PermDamageGolem : Permission {
 
     @SubscribeEvent(ignoreCancelled = true)
     fun e(e: EntityDamageByEntityEvent) {
-        if (e.entity is Golem) {
+        if (e.entity is IronGolem || e.entity is Snowman) {
             val player = e.damager as? Player ?: return
             e.entity.location.getRealm()?.run {
                 if (!isAdmin(player) && !hasPermission("damage_golem", player.name)) {

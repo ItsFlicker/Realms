@@ -8,13 +8,6 @@ import taboolib.common.platform.Awake
 import taboolib.library.xseries.XMaterial
 import taboolib.platform.util.buildItem
 
-/**
- * Realms
- * ink.ptms.realms.permission.PermAdmin
- *
- * @author sky
- * @since 2021/3/18 9:20 上午
- */
 object PermParticle : Permission {
 
     @Awake(LifeCycle.INIT)
@@ -29,7 +22,7 @@ object PermParticle : Permission {
         get() = -1
 
     override val default: Boolean
-        get() = true
+        get() = false
 
     override val worldSide: Boolean
         get() = true
@@ -43,7 +36,8 @@ object PermParticle : Permission {
             lore += listOf(
                 "",
                 "§7启用时:",
-                "§8自动播放领域边界粒子"
+                "§8自动播放领域边界粒子",
+                "§c警告: 可能造成客户端卡顿"
             )
             if (value) shiny()
         }

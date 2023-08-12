@@ -20,7 +20,6 @@ import taboolib.platform.util.buildItem
  * @author sky
  * @since 2021/3/18 9:20 上午
  */
-
 object PermTeleport : Permission {
 
     @Awake(LifeCycle.INIT)
@@ -46,7 +45,7 @@ object PermTeleport : Permission {
             lore += listOf(
                 "",
                 "§7允许行为:",
-                "§8通过传送进入或离开"
+                "§8通过传送进入"
             )
             if (value) shiny()
         }
@@ -54,12 +53,6 @@ object PermTeleport : Permission {
 
     @SubscribeEvent(ignoreCancelled = true)
     fun e(e: PlayerTeleportEvent) {
-        e.from.getRealm()?.run {
-            if (!isAdmin(e.player) && !hasPermission("teleport", e.player.name)) {
-                e.isCancelled = true
-                e.player.warning()
-            }
-        }
         e.to.getRealm()?.run {
             if (!isAdmin(e.player) && !hasPermission("teleport", e.player.name)) {
                 e.isCancelled = true

@@ -5,8 +5,9 @@ import ink.ptms.realms.RealmManager.isAdmin
 import ink.ptms.realms.RealmManager.register
 import ink.ptms.realms.util.display
 import ink.ptms.realms.util.warning
-import org.bukkit.entity.Player
-import org.bukkit.event.inventory.InventoryOpenEvent
+import org.bukkit.block.Container
+import org.bukkit.event.block.Action
+import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.inventory.ItemStack
 import taboolib.common.LifeCycle
 import taboolib.common.platform.Awake
@@ -21,7 +22,6 @@ import taboolib.platform.util.buildItem
  * @author sky
  * @since 2021/3/18 9:20 上午
  */
-
 object PermContainer : Permission {
 
     @Awake(LifeCycle.INIT)
@@ -51,13 +51,12 @@ object PermContainer : Permission {
     }
 
     @SubscribeEvent(ignoreCancelled = true)
-    fun e(e: InventoryOpenEvent) {
-        if (e.inventory.location != null) {
-            e.inventory.location?.getRealm()?.run {
-                val player = e.player as? Player ?: return
-                if (!isAdmin(player) && !hasPermission("container", e.player.name)) {
+    fun e(e: PlayerInteractEvent) {
+        if (e.action == Action.RIGHT_CLICK_BLOCK && e.clickedBlock?.state is Container) {
+            e.clickedBlock?.location?.getRealm()?.run {
+                if (!isAdmin(e.player) && !hasPermission("container", e.player.name)) {
                     e.isCancelled = true
-                    player.warning()
+                    e.player.warning()
                 }
             }
         }

@@ -19,7 +19,6 @@ import taboolib.platform.util.buildItem
  * @author 枫溪
  * @since 2021/4/18 8:30 上午
  */
-
 object PermJoin : Permission {
 
     @Awake(LifeCycle.INIT)

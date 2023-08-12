@@ -6,10 +6,12 @@ import org.bukkit.Location
 import taboolib.common.platform.ProxyParticle
 import taboolib.common.platform.sendTo
 import taboolib.common.util.Vector
-import taboolib.module.effect.Cube
 import taboolib.module.effect.ParticleSpawner
+import taboolib.module.effect.shape.Cube
+import taboolib.module.effect.shape.Line
 import taboolib.module.navigation.BoundingBox
 import taboolib.platform.util.toProxyLocation
+import java.awt.Color
 
 /**
  * Realms
@@ -18,9 +20,12 @@ import taboolib.platform.util.toProxyLocation
  * @author sky
  * @since 2021/3/11 5:09 下午
  */
-class RealmBlock(center: Location, var size: Int) {
+class RealmBlock(center: Location, var size: Int, var name: String) {
 
     val center = center
+        get() = field.clone()
+
+    var tploc = this.center.add(0.0, 1.0, 0.0)
         get() = field.clone()
 
     val permissions = HashMap<String, Boolean>()
@@ -30,7 +35,7 @@ class RealmBlock(center: Location, var size: Int) {
     val extends = HashMap<Location, Int>()
     val aabb = ArrayList<BoundingBox>()
 
-    var name: String = "领域"
+    var owner: String = name
     var joinTell: String = "§e+ §f$name | 欢迎"
     var leaveTell: String = "§e- §f$name | 慢走"
 
@@ -60,6 +65,7 @@ class RealmBlock(center: Location, var size: Int) {
                 }
             })
             json.addProperty("name", name)
+            json.addProperty("owner", owner)
             json.addProperty("joinTell", joinTell)
             json.addProperty("leaveTell", leaveTell)
         }.toString()
@@ -84,11 +90,11 @@ class RealmBlock(center: Location, var size: Int) {
      */
     fun update() {
         aabb.clear()
-        aabb.add(center.toCenterLocation().toProxyLocation().toAABB(size))
-        aabb.addAll(extends.map { it.key.toCenterLocation().toProxyLocation().toAABB(it.value) })
+        aabb.add(center.toCenterLocation().toAABB(size))
+        aabb.addAll(extends.map { it.key.toCenterLocation().toAABB(it.value) })
     }
 
-    /**x
+    /**
      * 是否在领域内
      */
     fun inside(loc: Location): Boolean {
@@ -96,19 +102,44 @@ class RealmBlock(center: Location, var size: Int) {
     }
 
     /**
-     * 向该玩家展示领地边界
+     * 判断是否碰撞
+     * 就是各轴互相是否包含，(other 包含当前包围盒) || (当前的包围盒包含 other)
      */
-    fun borderDisplay() {
+    fun intersect(other: BoundingBox): Boolean {
+        return aabb.any {
+            return@any ((it.minX >= other.minX && it.minX <= other.maxX) || (other.minX >= it.minX && other.minX <= it.maxX))
+                    && ((it.minY >= other.minY && it.minY <= other.maxY) || (other.minY >= it.minY && other.minY <= it.maxY))
+                    && ((it.minZ >= other.minZ && it.minZ <= other.maxZ) || (other.minZ >= it.minZ && other.minZ <= it.maxZ))
+        }
+    }
+
+    /**
+     * 展示领地边界和子领域连接
+     */
+    fun particleDisplay() {
         aabb.forEach { box ->
             Cube(
                 Location(center.world, box.minX, box.minY, box.minZ).toProxyLocation(),
                 Location(center.world, box.maxX, box.maxY, box.maxZ).toProxyLocation(),
-                2.0,
+                1.0,
                 object : ParticleSpawner {
                     override fun spawn(location: taboolib.common.util.Location) {
-                        ProxyParticle.END_ROD.sendTo(location, range = 50.0, offset = Vector(0, 0, 0), count = 1)
+                        ProxyParticle.END_ROD.sendTo(location, range = 100.0, offset = Vector(0, 0, 0), count = 1)
                     }
             }).show()
+        }
+        extends.forEach { (location, _) ->
+            Line(
+                center.toCenterLocation().toProxyLocation(),
+                location.toCenterLocation().toProxyLocation(),
+                0.5,
+                object : ParticleSpawner {
+                    override fun spawn(location: taboolib.common.util.Location) {
+                        ProxyParticle.REDSTONE.sendTo(location, 50.0, Vector(0, 0, 0), 5, data = ProxyParticle.DustData(
+                            Color(152, 249, 255), 1f))
+                    }
+                }
+            ).show()
         }
     }
 

@@ -5,6 +5,7 @@ import ink.ptms.realms.RealmManager.isAdmin
 import ink.ptms.realms.RealmManager.register
 import ink.ptms.realms.util.display
 import ink.ptms.realms.util.warning
+import org.bukkit.entity.EntityType
 import org.bukkit.event.block.Action
 import org.bukkit.event.player.PlayerInteractEntityEvent
 import org.bukkit.event.player.PlayerInteractEvent
@@ -22,7 +23,6 @@ import taboolib.platform.util.buildItem
  * @author sky
  * @since 2021/3/18 9:20 上午
  */
-
 object PermInteract : Permission {
 
     @Awake(LifeCycle.INIT)
@@ -65,10 +65,12 @@ object PermInteract : Permission {
 
     @SubscribeEvent(ignoreCancelled = true)
     fun e(e: PlayerInteractEntityEvent) {
-        e.rightClicked.location.getRealm()?.run {
-            if (!isAdmin(e.player) && !hasPermission("interact", e.player.name)) {
-                e.isCancelled = true
-                e.player.warning()
+        if (e.rightClicked.type != EntityType.VILLAGER) {
+            e.rightClicked.location.getRealm()?.run {
+                if (!isAdmin(e.player) && !hasPermission("interact", e.player.name)) {
+                    e.isCancelled = true
+                    e.player.warning()
+                }
             }
         }
     }

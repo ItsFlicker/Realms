@@ -1,17 +1,10 @@
 package ink.ptms.realms.permission
 
 import ink.ptms.realms.RealmManager.getRealm
-import ink.ptms.realms.RealmManager.isAdmin
 import ink.ptms.realms.RealmManager.register
 import ink.ptms.realms.util.display
 import ink.ptms.realms.util.warning
-import org.bukkit.entity.Boss
-import org.bukkit.entity.EnderDragon
-import org.bukkit.entity.Flying
-import org.bukkit.entity.Monster
 import org.bukkit.entity.Player
-import org.bukkit.entity.Shulker
-import org.bukkit.entity.Slime
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.inventory.ItemStack
 import taboolib.common.LifeCycle
@@ -20,14 +13,7 @@ import taboolib.common.platform.event.SubscribeEvent
 import taboolib.library.xseries.XMaterial
 import taboolib.platform.util.buildItem
 
-/**
- * Realms
- * ink.ptms.realms.permission.PermDamageMonster
- *
- * @author sky
- * @since 2021/3/18 9:20 上午
- */
-object PermDamageMonster : Permission {
+object PermPvp : Permission{
 
     @Awake(LifeCycle.INIT)
     internal fun init() {
@@ -35,24 +21,21 @@ object PermDamageMonster : Permission {
     }
 
     override val id: String
-        get() = "damage_monster"
-
-    override val default: Boolean
-        get() = true
+        get() = "pvp"
 
     override val worldSide: Boolean
         get() = true
 
     override val playerSide: Boolean
-        get() = true
+        get() = false
 
     override fun generateMenuItem(value: Boolean): ItemStack {
-        return buildItem(XMaterial.GOLDEN_SWORD) {
-            name = "§f攻击怪物 ${value.display}"
+        return buildItem(XMaterial.NETHERITE_SWORD) {
+            name = "§fPVP ${value.display}"
             lore += listOf(
                 "",
                 "§7允许行为:",
-                "§8对怪物 (Boss,Flying,Monster,Shulker,Slime) 造成伤害"
+                "§8PVP"
             )
             if (value) shiny()
         }
@@ -60,14 +43,13 @@ object PermDamageMonster : Permission {
 
     @SubscribeEvent(ignoreCancelled = true)
     fun e(e: EntityDamageByEntityEvent) {
-        if (e.entity is Boss || e.entity is Flying || e.entity is Monster || e.entity is Shulker || e.entity is Slime) {
-            val player = e.damager as? Player ?: return
+        if (e.entity is Player && e.damager is Player && !e.damager.isOp) {
             e.entity.location.getRealm()?.run {
-                if (!isAdmin(player) && !hasPermission("damage_monster", player.name)) {
+                if (!hasPermission("pvp", def = false)) {
                     e.isCancelled = true
-                    player.warning()
+                    (e.damager as Player).warning()
                 }
-            }
+            } ?: kotlin.run { e.isCancelled = true }
         }
     }
 }

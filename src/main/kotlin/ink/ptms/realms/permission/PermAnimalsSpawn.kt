@@ -4,7 +4,7 @@ import ink.ptms.realms.RealmManager.getRealm
 import ink.ptms.realms.RealmManager.register
 import ink.ptms.realms.util.display
 import org.bukkit.entity.Animals
-import org.bukkit.event.entity.EntitySpawnEvent
+import org.bukkit.event.entity.CreatureSpawnEvent
 import org.bukkit.inventory.ItemStack
 import taboolib.common.LifeCycle
 import taboolib.common.platform.Awake
@@ -18,7 +18,6 @@ import taboolib.platform.util.buildItem
  * @author 枫溪
  * @since 2021/4/18 8:30 上午
  */
-
 object PermAnimalsSpawn : Permission {
 
     @Awake(LifeCycle.INIT)
@@ -51,13 +50,12 @@ object PermAnimalsSpawn : Permission {
     }
 
     @SubscribeEvent(ignoreCancelled = true)
-    fun e(e: EntitySpawnEvent) {
-        if (e.entity !is Animals){
-            return
-        }
-        e.entity.location.getRealm()?.run {
-            if (!hasPermission("animals_spawn", def = false)) {
-                e.isCancelled = true
+    fun e(e: CreatureSpawnEvent) {
+        if (e.entity is Animals && e.spawnReason == CreatureSpawnEvent.SpawnReason.NATURAL){
+            e.entity.location.getRealm()?.run {
+                if (!hasPermission("animals_spawn", def = false)) {
+                    e.isCancelled = true
+                }
             }
         }
     }

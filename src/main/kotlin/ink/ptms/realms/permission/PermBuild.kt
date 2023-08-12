@@ -5,6 +5,7 @@ import ink.ptms.realms.RealmManager.isAdmin
 import ink.ptms.realms.RealmManager.register
 import ink.ptms.realms.util.display
 import ink.ptms.realms.util.warning
+import org.bukkit.Material
 import org.bukkit.entity.ArmorStand
 import org.bukkit.entity.Player
 import org.bukkit.event.block.Action
@@ -31,7 +32,6 @@ import taboolib.platform.util.buildItem
  * @author sky
  * @since 2021/3/18 9:20 上午
  */
-
 object PermBuild : Permission {
 
     @Awake(LifeCycle.INIT)
@@ -107,7 +107,7 @@ object PermBuild : Permission {
 
     @SubscribeEvent(ignoreCancelled = true)
     fun e(e: PlayerInteractEvent) {
-        if (e.action == Action.RIGHT_CLICK_BLOCK && e.item?.type == org.bukkit.Material.ARMOR_STAND) {
+        if (e.action == Action.RIGHT_CLICK_BLOCK && e.item?.type == Material.ARMOR_STAND) {
             e.clickedBlock?.location?.getRealm()?.run {
                 if (!isAdmin(e.player) && !hasPermission("build", e.player.name)) {
                     e.isCancelled = true
@@ -121,7 +121,7 @@ object PermBuild : Permission {
     fun e(e: EntityDamageByEntityEvent) {
         if (e.entity is ArmorStand) {
             val player = e.attacker as? Player ?: return
-            e.entity.location.block.location.getRealm()?.run {
+            e.entity.location.getRealm()?.run {
                 if (!isAdmin(player) && !hasPermission("build", player.name)) {
                     e.isCancelled = true
                     player.warning()

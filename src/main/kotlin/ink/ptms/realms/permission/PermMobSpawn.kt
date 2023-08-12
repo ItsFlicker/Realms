@@ -4,7 +4,8 @@ import ink.ptms.realms.RealmManager.getRealm
 import ink.ptms.realms.RealmManager.register
 import ink.ptms.realms.util.display
 import org.bukkit.entity.Mob
-import org.bukkit.event.entity.EntitySpawnEvent
+import org.bukkit.entity.Monster
+import org.bukkit.event.entity.CreatureSpawnEvent
 import org.bukkit.inventory.ItemStack
 import taboolib.common.LifeCycle
 import taboolib.common.platform.Awake
@@ -18,7 +19,6 @@ import taboolib.platform.util.buildItem
  * @author 枫溪
  * @since 2021/4/18 8:30 上午
  */
-
 object PermMobSpawn : Permission {
 
     @Awake(LifeCycle.INIT)
@@ -44,20 +44,19 @@ object PermMobSpawn : Permission {
             lore += listOf(
                 "",
                 "§7允许行为:",
-                "§8生成怪物"
+                "§8怪物自然生成"
             )
             if (value) shiny()
         }
     }
 
     @SubscribeEvent(ignoreCancelled = true)
-    fun e(e: EntitySpawnEvent) {
-        if (e.entity !is Mob){
-            return
-        }
-        e.entity.location.getRealm()?.run {
-            if (!hasPermission("mob_spawn", def = false)) {
-                e.isCancelled = true
+    fun e(e: CreatureSpawnEvent) {
+        if (e.entity is Monster && e.spawnReason == CreatureSpawnEvent.SpawnReason.NATURAL){
+            e.entity.location.getRealm()?.run {
+                if (!hasPermission("mob_spawn", def = false)) {
+                    e.isCancelled = true
+                }
             }
         }
     }

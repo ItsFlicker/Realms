@@ -1,7 +1,7 @@
 package ink.ptms.realms
 
 import com.google.gson.JsonParser
-import ink.ptms.adyeshach.api.AdyeshachAPI
+import ink.ptms.adyeshach.core.Adyeshach
 import ink.ptms.realms.data.RealmBlock
 import ink.ptms.realms.data.RealmWorld
 import ink.ptms.realms.event.RealmsJoinEvent
@@ -10,7 +10,6 @@ import ink.ptms.realms.permission.Permission
 import ink.ptms.realms.redlib.event.DataBlockDestroyEvent
 import ink.ptms.realms.redlib.getDataContainer
 import ink.ptms.realms.util.Helper
-import ink.ptms.realms.util.getVertex
 import ink.ptms.realms.util.toAABB
 import org.bukkit.*
 import org.bukkit.block.Block
@@ -30,13 +29,17 @@ import taboolib.common.platform.Schedule
 import taboolib.common.platform.event.EventPriority
 import taboolib.common.platform.event.SubscribeEvent
 import taboolib.common.platform.function.adaptPlayer
-import taboolib.common.platform.function.submit
+import taboolib.common.platform.function.submitAsync
 import taboolib.common.platform.sendTo
 import taboolib.common.util.Vector
+import taboolib.common.util.unsafeLazy
 import taboolib.common5.Coerce
 import taboolib.library.xseries.XMaterial
-import taboolib.module.effect.Line
-import taboolib.module.effect.ParticleSpawner
+import taboolib.module.chat.colored
+import taboolib.module.configuration.Type
+import taboolib.module.configuration.createLocal
+import taboolib.module.configuration.util.getLocation
+import taboolib.module.configuration.util.setLocation
 import taboolib.module.nms.ItemTagData
 import taboolib.module.nms.getItemTag
 import taboolib.module.nms.inputSign
@@ -56,11 +59,13 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object RealmManager : Helper {
 
-    private val permissions = ArrayList<Permission>()
+    val storage by unsafeLazy { createLocal("storage.json", type = Type.JSON) }
+    private val registeredPermissions = ArrayList<Permission>()
     private val worlds = ConcurrentHashMap<String, RealmWorld>()
 
     @Awake(LifeCycle.ENABLE)
     fun init() {
+        storage
         Bukkit.getWorlds().forEach {
             val realmWorld = it.realmWorld()
             it.loadedChunks.forEach { chunk ->
@@ -69,7 +74,7 @@ object RealmManager : Helper {
         }
     }
 
-    @Schedule(async = true, period = 20)
+    @Schedule(async = true, period = 40)
     fun particle() {
         Bukkit.getWorlds().forEach {
             it.realms().forEach { realm ->
@@ -77,19 +82,9 @@ object RealmManager : Helper {
 
                 realm.extends.forEach { (location, _) ->
                     ProxyParticle.REDSTONE.sendTo(location.toCenterLocation().toProxyLocation(), 50.0, Vector(0.5, 0.5, 0.5), 5, data = ProxyParticle.DustData(Color(152, 249, 255), 1f))
-                    Line(
-                        realm.center.toCenterLocation().toProxyLocation(),
-                        location.toCenterLocation().toProxyLocation(),
-                        0.35,
-                        object : ParticleSpawner {
-                            override fun spawn(location: taboolib.common.util.Location) {
-                                ProxyParticle.REDSTONE.sendTo(location, 50.0, Vector(0, 0, 0), 5, data = ProxyParticle.DustData(Color(152, 249, 255), 1f))
-                            }
-                        }
-                    ).show()
                 }
-                if (realm.hasPermission("particle", def = true)) {
-                    realm.borderDisplay()
+                if (realm.hasPermission("particle", def = false)) {
+                    realm.particleDisplay()
                 }
             }
         }
@@ -99,10 +94,9 @@ object RealmManager : Helper {
     @SubscribeEvent
     fun e(e: ChunkLoadEvent) {
         val realmWorld = e.chunk.world.realmWorld()
-        if (realmWorld.realms.containsKey(e.chunk.chunkKey)) {
-            return
+        if (!realmWorld.realms.containsKey(e.chunk.chunkKey)) {
+            realmWorld.realms[e.chunk.chunkKey] = e.chunk.realms().toMutableList()
         }
-        realmWorld.realms[e.chunk.chunkKey] = e.chunk.realms().toMutableList()
     }
 
     @SubscribeEvent
@@ -125,7 +119,7 @@ object RealmManager : Helper {
         if (e.action == Action.RIGHT_CLICK_BLOCK && e.clickedBlock!!.isRealmBlock()) {
             e.isCancelled = true
             val realmBlock = e.clickedBlock!!.getRealmBlock()!!
-            if (realmBlock.hasPermission("admin", e.player.name)) {
+            if (realmBlock.hasPermission("admin", e.player.name) || e.player.isOp) {
                 realmBlock.open(e.player)
             } else {
                 e.player.sendHolographic(e.clickedBlock!!.location.add(0.5, 1.0, 0.5), "§c:(", "§7这不属于你.")
@@ -148,7 +142,7 @@ object RealmManager : Helper {
                         e.player.sendHolographic(e.block.location.toCenterLocation(), "§c:(", "§7领域已移除.")
                         e.block.world.playEffect(e.block.location.toCenterLocation(), Effect.STEP_SOUND, e.block.type)
                         e.block.type = Material.AIR
-                        e.block.world.dropItem(e.block.location.toCenterLocation(), Realms.realmsDust.also {
+                        e.block.world.dropItemNaturally(e.block.location.toCenterLocation(), Realms.realmsDust.also {
                             it.amount = realmBlock.size
                         })
                         realmBlock.remove()
@@ -158,10 +152,10 @@ object RealmManager : Helper {
                 else if (realmBlock.extends.containsKey(e.block.location)) {
                     e.block.world.playEffect(e.block.location.toCenterLocation(), Effect.STEP_SOUND, e.block.type)
                     e.block.type = Material.AIR
-                    e.block.world.dropItem(e.block.location.toCenterLocation(), Realms.realmsDust.also {
+                    e.block.world.dropItemNaturally(e.block.location.toCenterLocation(), Realms.realmsDust.also {
                         it.amount = realmBlock.extends.remove(e.block.location)!!
                     })
-                    e.player.sendHolographic(e.block.location.toCenterLocation(), "§c:(", "§7领域已移除.")
+                    e.player.sendHolographic(e.block.location.toCenterLocation(), "§c:(", "§7子领域已移除.")
                     realmBlock.update()
                     realmBlock.save()
                 }
@@ -175,12 +169,18 @@ object RealmManager : Helper {
     fun e(e: BlockPlaceEvent) {
         val realmSize = e.itemInHand.getRealmSize()
         if (realmSize > 0) {
-            val realms = e.block.location.toCenterLocation().toProxyLocation().toAABB(realmSize).getVertex().mapNotNull { vertex ->
-                vertex.toLocation(e.block.world.name).toBukkitLocation().getRealm()
-            }.toSet().toList()
+            val aabb = e.block.location.toCenterLocation().toAABB(realmSize)
+            val realms = e.block.location.world.realms().filter { it.intersect(aabb) }
             when {
                 realms.isEmpty() -> {
-                    RealmBlock(e.block.location, realmSize).also { it.name = e.player.name }.create(e.player)
+                    val exist = storage.getKeys(false)
+                    var name = e.player.name
+                    var i = 2
+                    while (name in exist) {
+                        name = e.player.name + i.toString()
+                        i++
+                    }
+                    RealmBlock(e.block.location, realmSize, name).create(e.player)
                     e.block.getDataContainer()!!["realms"] = true
                     e.player.playSound(e.player.location, Sound.BLOCK_ENCHANTMENT_TABLE_USE, 1f, 1f)
                     e.player.sendHolographic(e.block.location.toCenterLocation().add(0.0, 1.0, 0.0), "§e:)", "§f领域已创建")
@@ -198,7 +198,7 @@ object RealmManager : Helper {
                     e.player.openMenu<Linked<RealmBlock>>("领域合并") {
                         rows(6)
                         elements { realms }
-                        slots(inventoryCenterSlots)
+                        slots(Slots.CENTER)
                         setPreviousPage(47) { _, hasPreviousPage ->
                             if (hasPreviousPage) buildItem(XMaterial.SPECTRAL_ARROW) { name = "§f上一页" }
                             else buildItem(XMaterial.ARROW) { name = "§8上一页"}
@@ -217,10 +217,7 @@ object RealmManager : Helper {
                                 "§c多个连续重合的领域只有一个主领域")
                         })
                         onClick { _, element ->
-                            val verify =
-                                e.block.location.toCenterLocation().toProxyLocation().toAABB(realmSize).getVertex().mapNotNull { vertex ->
-                                    vertex.toLocation(e.block.world.name).toBukkitLocation().getRealm()
-                                }
+                            val verify = e.block.location.world.realms().filter { it.intersect(aabb) }
                             // 验证重合领域权限
                             if (verify.any { !it.hasPermission("admin", e.player.name) }) {
                                 e.player.closeInventory()
@@ -246,8 +243,8 @@ object RealmManager : Helper {
                             }
                             select.save()
                             select.update()
-                            submit(async = true) {
-                                select.borderDisplay()
+                            submitAsync {
+                                select.particleDisplay()
                             }
                             if (e.player.gameMode == GameMode.SURVIVAL) {
                                 e.itemInHand.amount--
@@ -272,8 +269,8 @@ object RealmManager : Helper {
     }
 
     fun Permission.register() {
-        if (!permissions.contains(this)) {
-            permissions.add(this)
+        if (!registeredPermissions.contains(this)) {
+            registeredPermissions.add(this)
         }
     }
 
@@ -312,38 +309,50 @@ object RealmManager : Helper {
     }
 
     fun RealmBlock.create(player: Player) {
+        owner = player.name
         users.computeIfAbsent(player.name) { HashMap() }["admin"] = true
         center.world.realmWorld().realms.computeIfAbsent(center.chunk.chunkKey) { ArrayList() }.add(this)
-        this@RealmManager.permissions.forEach {
+        this@RealmManager.registeredPermissions.forEach {
             permissions[it.id] = it.default
         }
         save()
     }
 
     fun RealmBlock.save() {
-        center.chunk.persistentDataContainer.set(NamespacedKey(Realms.plugin, node), PersistentDataType.STRING, json)
+        center.chunk.persistentDataContainer.set(NamespacedKey(bukkitPlugin, node), PersistentDataType.STRING, json)
+        storage["$name.owner"] = owner
+        storage.setLocation("$name.location", center.toProxyLocation())
+        storage.setLocation("$name.tploc", tploc.toProxyLocation())
     }
 
     fun RealmBlock.remove() {
         center.world.realmWorld().realms[center.chunk.chunkKey]?.remove(this)
-        center.chunk.persistentDataContainer.remove(NamespacedKey(Realms.plugin, node))
+        center.chunk.persistentDataContainer.remove(NamespacedKey(bukkitPlugin, node))
+        storage[name] = null
     }
 
-    fun RealmBlock.getAdmin(): String {
-        return users.keys.firstOrNull { hasPermission("admin", it, false) }!!
+    fun RealmBlock.getAdmins(): List<String> {
+        return users.keys.filter { hasPermission("admin", it, false) }
     }
 
     fun RealmBlock.isAdmin(player: Player): Boolean {
-        return getAdmin() == player.name || player.isOp
+        return player.name in getAdmins() || player.isOp
     }
 
     fun RealmBlock.editName(player: Player) {
-        player.inputSign(arrayOf("", "", "↑请输入领域名称")) { les ->
-            val names = "${les[0]}${les[1]}".screen()
-            if (names.isEmpty()) {
+        player.inputSign(arrayOf("", "", "↑请输入领域名称", "")) {
+            val names = "${it[0]}${it[1]}".screen()
+            if (names.isEmpty() || names == name) {
                 player.error("放弃了编辑!")
+                player.closeInventory()
                 return@inputSign
             }
+            if (names in storage.getKeys(false)) {
+                player.error("领域名与其他领域冲突!")
+                player.closeInventory()
+                return@inputSign
+            }
+            storage[name] = null
             name = names
             player.info("当前领域名称更改为了 &f$names")
             openSettings(player)
@@ -352,13 +361,12 @@ object RealmManager : Helper {
     }
 
     fun RealmBlock.editJoinTell(player: Player) {
-        player.inputSign(arrayOf("", "", "↑请输入进入提示", "(第二行为子标题)")) { les ->
-            if (les[0].isEmpty() && les[1].isEmpty()) {
-                player.error("放弃了编辑!")
-                openSettings(player)
-                return@inputSign
+        player.inputSign(arrayOf("", "", "↑请输入进入提示", "(第二行为子标题)")) {
+            val info = if (it[0].isEmpty() && it[1].isEmpty()) {
+                ""
+            } else {
+                "${it[0]} | ${it[1]}".colored()
             }
-            val info = "${les[0]} | ${les[1]}".replace('§', '§')
             joinTell = info
             player.info("变更成功")
             openSettings(player)
@@ -367,13 +375,12 @@ object RealmManager : Helper {
     }
 
     fun RealmBlock.editLeaveTell(player: Player) {
-        player.inputSign(arrayOf("", "", "↑请输入离开提示", "(第二行为子标题)")) { les ->
-            if (les[0].isEmpty() && les[1].isEmpty()) {
-                player.error("放弃了编辑!")
-                openSettings(player)
-                return@inputSign
+        player.inputSign(arrayOf("", "", "↑请输入离开提示", "(第二行为子标题)")) {
+            val info = if (it[0].isEmpty() && it[1].isEmpty()) {
+                ""
+            } else {
+                "${it[0]} | ${it[1]}".colored()
             }
-            val info = "${les[0]} | ${les[1]}".replace('§', '§')
             leaveTell = info
             player.info("变更成功")
             openSettings(player)
@@ -390,7 +397,7 @@ object RealmManager : Helper {
                 name = "§f领域信息"
                 lore.addAll(listOf(
                     "§7名称: §f${this@open.name}",
-                    "§7持有者: §f${this@open.getAdmin()}",
+                    "§7持有者: §f${this@open.getAdmins().joinToString(",")}",
                 ))
             })
             set('1', buildItem(XMaterial.COMMAND_BLOCK) { name = "§f全局权限";lore += "§7将作用于所有玩家" })
@@ -410,7 +417,11 @@ object RealmManager : Helper {
         player.playSound(player.location, Sound.BLOCK_ENCHANTMENT_TABLE_USE, 1f, 1f)
         player.openMenu<Basic>("§f领域管理 [领域设置]") {
             rows(3)
-            map("", "#012")
+            map(
+                "",
+                "#012",
+                ""
+            )
             set('0', buildItem(XMaterial.NAME_TAG) {
                 name = "§f领域名称"
                 lore.addAll(listOf(
@@ -453,13 +464,13 @@ object RealmManager : Helper {
         player.openMenu<Linked<Permission>>("领域管理 [全局权限]") {
             rows(6)
             elements {
-                val list = RealmManager.permissions.filter { it.worldSide }.sortedBy { it.priority }.toMutableList()
+                val list = registeredPermissions.filter { it.worldSide }.sortedBy { it.priority }.toMutableList()
                 if (!player.isOp) {
                     list.removeAll(list.filter { it.adminSide })
                 }
                 list
             }
-            slots(inventoryCenterSlots)
+            slots(Slots.CENTER)
             setPreviousPage(47) { _, hasPreviousPage ->
                 if (hasPreviousPage) buildItem(XMaterial.SPECTRAL_ARROW) { name = "§f上一页" }
                 else buildItem(XMaterial.ARROW) { name = "§8上一页"}
@@ -492,22 +503,21 @@ object RealmManager : Helper {
         player.openMenu<Linked<String>>("领域管理 [用户权限]") {
             rows(6)
             elements { users.keys.filter { it != player.name } }
-            slots(inventoryCenterSlots)
+            slots(Slots.CENTER)
             set(49, buildItem(XMaterial.WRITABLE_BOOK) {
                 name = "§f添加用户"
                 lore += "§7点击通过输入名称来添加用户"
             }) {
                 player.closeInventory()
-                player.inputSign(arrayOf("", "", "在第一行输入用户名称")) {
-                    val playerExact = Bukkit.getPlayerExact(it[0])
+                player.info("在聊天框输入用户名称")
+                player.nextChat {
+                    val playerExact = Bukkit.getPlayerExact(it)
                     when {
                         playerExact == null -> {
                             player.error("§c用户${it[0]}不在游戏")
-                            return@inputSign
                         }
                         playerExact.name == player.name -> {
                             player.error("§c你不能添加自己")
-                            return@inputSign
                         }
                         else -> {
                             users[playerExact.name] = HashMap()
@@ -543,9 +553,9 @@ object RealmManager : Helper {
         player.openMenu<Linked<Permission>>("领域管理 [用户权限 : $user]") {
             rows(6)
             elements {
-                RealmManager.permissions.filter { it.playerSide }.sortedBy { it.priority }.filterNot { it.adminSide && !player.isOp }
+                registeredPermissions.filter { it.playerSide }.sortedBy { it.priority }.filterNot { it.adminSide && !player.isOp }
             }
-            slots(inventoryCenterSlots)
+            slots(Slots.CENTER)
             setPreviousPage(47) { _, hasPreviousPage ->
                 if (hasPreviousPage) buildItem(XMaterial.SPECTRAL_ARROW) { name = "§f上一页" }
                 else buildItem(XMaterial.ARROW) { name = "§8上一页" }
@@ -577,7 +587,7 @@ object RealmManager : Helper {
     fun Chunk.realms() = persistentDataContainer.keys.filter { it.key.startsWith("realm_") }.map { realm ->
         val position = realm.key.substring("realm_".length).split("_")
         val json = JsonParser().parse(persistentDataContainer[realm, PersistentDataType.STRING]).asJsonObject
-        RealmBlock(position.toLocation(world), json["size"].asInt).also { realmBlock ->
+        RealmBlock(position.toLocation(world), json["size"].asInt, json["name"].asString).also { realmBlock ->
             json["permissions"].asJsonObject.entrySet().forEach { (k, v) ->
                 realmBlock.permissions[k] = v.asBoolean
             }
@@ -587,8 +597,8 @@ object RealmManager : Helper {
             json["extends"].asJsonObject.entrySet().forEach { (k, v) ->
                 realmBlock.extends[k.split(",").toLocation(world)] = v.asInt
             }
-            json["name"].asString.also { name ->
-                realmBlock.name = name
+            json["owner"]?.asString?.also { value ->
+                realmBlock.owner = value
             }
             json["joinTell"].asString.also { value ->
                 realmBlock.joinTell = value
@@ -596,6 +606,7 @@ object RealmManager : Helper {
             json["leaveTell"].asString.also { value ->
                 realmBlock.leaveTell = value
             }
+            storage.getConfigurationSection(json["name"].asString)?.getLocation("tploc")?.toBukkitLocation()?.let { realmBlock.tploc = it }
             realmBlock.update()
         }
     }
@@ -607,32 +618,24 @@ object RealmManager : Helper {
     @SubscribeEvent
     fun onJoinEvent(event: RealmsJoinEvent) {
         val realm = event.realmBlock ?: return
-        submit(async = true) {
-            realm.borderDisplay()
+        submitAsync {
+            realm.particleDisplay()
         }
-        val message = realm.joinTell.split(" | ")
-        if (message.size >= 2) {
-            adaptPlayer(event.player).sendTitle(message[0], message[1], 20, 40, 20)
-            return
-        }
-        adaptPlayer(event.player).sendTitle(message[0], "", 20, 40, 20)
+        val message = realm.joinTell.ifEmpty { return }.split(" | ")
+        adaptPlayer(event.player).sendTitle(message[0], message[1], 15, 20, 15)
     }
 
     @SubscribeEvent
     fun onLeaveEvent(event: RealmsLeaveEvent) {
         val realm = event.realmBlock ?: return
-        submit(async = true) {
-            realm.borderDisplay()
+        submitAsync {
+            realm.particleDisplay()
         }
-        val message = realm.leaveTell.split(" | ")
-        if (message.size >= 2) {
-            adaptPlayer(event.player).sendTitle(message[0], message[1], 20, 40, 20)
-            return
-        }
-        adaptPlayer(event.player).sendTitle(message[0], "", 20, 40, 20)
+        val message = realm.leaveTell.ifEmpty { return }.split(" | ")
+        adaptPlayer(event.player).sendTitle(message[0], message[1], 15, 20, 15)
     }
 
     private fun Player.sendHolographic(location: Location, vararg message: String) {
-        AdyeshachAPI.createHolographic(this, location, *message)
+        Adyeshach.api().getHologramHandler().sendHologramMessage(this, location, message.toList())
     }
 }

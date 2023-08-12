@@ -20,7 +20,6 @@ import taboolib.platform.util.buildItem
  * @author 枫溪
  * @since 2021/4/18 8:30 上午
  */
-
 object PermChat : Permission {
 
     @Awake(LifeCycle.INIT)
@@ -34,6 +33,9 @@ object PermChat : Permission {
     override val default: Boolean
         get() = true
 
+    override val adminSide: Boolean
+        get() = true
+
     override val worldSide: Boolean
         get() = true
 
@@ -44,6 +46,7 @@ object PermChat : Permission {
         return buildItem(XMaterial.WHITE_DYE) {
             name = "§f聊天 ${value.display}"
             lore += listOf(
+                "§c管理员选项",
                 "",
                 "§7允许行为:",
                 "§8发送消息"

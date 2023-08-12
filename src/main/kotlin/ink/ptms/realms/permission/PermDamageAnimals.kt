@@ -5,8 +5,13 @@ import ink.ptms.realms.RealmManager.isAdmin
 import ink.ptms.realms.RealmManager.register
 import ink.ptms.realms.util.display
 import ink.ptms.realms.util.warning
+import org.bukkit.entity.Allay
+import org.bukkit.entity.Ambient
 import org.bukkit.entity.Animals
+import org.bukkit.entity.Breedable
+import org.bukkit.entity.NPC
 import org.bukkit.entity.Player
+import org.bukkit.entity.WaterMob
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.inventory.ItemStack
 import taboolib.common.LifeCycle
@@ -22,7 +27,6 @@ import taboolib.platform.util.buildItem
  * @author sky
  * @since 2021/3/18 9:20 上午
  */
-
 object PermDamageAnimals : Permission {
 
     @Awake(LifeCycle.INIT)
@@ -45,7 +49,7 @@ object PermDamageAnimals : Permission {
             lore += listOf(
                 "",
                 "§7允许行为:",
-                "§8对动物 (Animals) 造成伤害"
+                "§8对动物 (Allay,Ambient,Animals,NPC,WaterMob) 造成伤害"
             )
             if (value) shiny()
         }
@@ -53,7 +57,7 @@ object PermDamageAnimals : Permission {
 
     @SubscribeEvent(ignoreCancelled = true)
     fun e(e: EntityDamageByEntityEvent) {
-        if (e.entity is Animals) {
+        if (e.entity is Allay || e.entity is Ambient || e.entity is Animals || e.entity is NPC || e.entity is WaterMob) {
             val player = e.damager as? Player ?: return
             e.entity.location.getRealm()?.run {
                 if (!isAdmin(player) && !hasPermission("damage_animals", player.name)) {

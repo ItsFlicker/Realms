@@ -1,8 +1,8 @@
 plugins {
     `java-library`
     `maven-publish`
-    id("io.izzel.taboolib") version "1.40"
-    id("org.jetbrains.kotlin.jvm") version "1.5.10"
+    id("io.izzel.taboolib") version "1.56"
+    id("org.jetbrains.kotlin.jvm") version "1.7.21"
 }
 
 taboolib {
@@ -10,6 +10,7 @@ taboolib {
         contributors {
             name("坏黑")
             name("枫溪")
+            name("ItsFlicker")
         }
         dependencies {
             name("Adyeshach")
@@ -25,9 +26,10 @@ taboolib {
         "module-nms-util",
         "module-ui"
     )
+    install("expansion-command-helper")
     install("platform-bukkit")
     classifier = null
-    version = "6.0.9-39"
+    version = "6.0.10-117"
 }
 
 repositories {
@@ -36,11 +38,11 @@ repositories {
 }
 
 dependencies {
-    compileOnly("ink.ptms:Adyeshach:1.5.7")
-
     compileOnly("ink.ptms.core:v11604:11604")
     compileOnly("ink.ptms.core:v11900:11900:mapped")
     compileOnly("ink.ptms.core:v11900:11900:universal")
+
+    compileOnly("ink.ptms.adyeshach:all:2.0.0-snapshot-10")
 
     compileOnly(kotlin("stdlib"))
     compileOnly(fileTree("libs"))

@@ -32,7 +32,7 @@ object BlockDataContainer {
 
     @Awake(LifeCycle.LOAD)
     private fun init() {
-        // 在 ENABLE 之前初始化 BlockDataManager，否则脚本将无法正常调用
+        // 在 ENABLE 之前初始化 BlockDataManager
         TabooLibCommon.postpone(LifeCycle.ENABLE) {
             manager = BlockDataManager.createAuto(getDataFolder().toPath().resolve("blocks.db"), true, true)
         }

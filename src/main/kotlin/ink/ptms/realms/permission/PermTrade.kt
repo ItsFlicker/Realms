@@ -5,8 +5,9 @@ import ink.ptms.realms.RealmManager.isAdmin
 import ink.ptms.realms.RealmManager.register
 import ink.ptms.realms.util.display
 import ink.ptms.realms.util.warning
+import org.bukkit.entity.EntityType
 import org.bukkit.entity.Villager
-import org.bukkit.event.player.PlayerInteractAtEntityEvent
+import org.bukkit.event.player.PlayerInteractEntityEvent
 import org.bukkit.inventory.ItemStack
 import taboolib.common.LifeCycle
 import taboolib.common.platform.Awake
@@ -21,7 +22,6 @@ import taboolib.platform.util.buildItem
  * @author sky
  * @since 2021/3/18 9:20 上午
  */
-
 object PermTrade : Permission {
 
     @Awake(LifeCycle.INIT)
@@ -51,7 +51,7 @@ object PermTrade : Permission {
     }
 
     @SubscribeEvent(ignoreCancelled = true)
-    fun e(e: PlayerInteractAtEntityEvent) {
+    fun e(e: PlayerInteractEntityEvent) {
         if (e.rightClicked is Villager) {
             e.rightClicked.location.getRealm()?.run {
                 if (!isAdmin(e.player) && !hasPermission("trade", e.player.name)) {

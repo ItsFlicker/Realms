@@ -1,11 +1,9 @@
 package ink.ptms.realms.util
 
+import org.bukkit.Location
 import org.bukkit.entity.Player
 import taboolib.common.platform.function.adaptPlayer
-import taboolib.common.util.Location
 import taboolib.common.util.Vector
-import taboolib.module.effect.Line
-import taboolib.module.effect.ParticleSpawner
 import taboolib.module.navigation.BoundingBox
 
 fun Location.toAABB(size: Int) = BoundingBox(
@@ -18,28 +16,16 @@ fun Location.toAABB(size: Int) = BoundingBox(
 )
 
 fun BoundingBox.getVertex(): List<Vector> {
-    val vertex = mutableSetOf<Vector>()
-    Line(
-        Location(null, minX, minY, maxZ),
-        Location(null, maxX, maxY, minZ),
-        1.0,
-        object : ParticleSpawner {
-            override fun spawn(location: Location) {
-                vertex.add(Vector(location.x, location.y, location.z))
-            }
-        }
-    ).show()
-    Line(
-        Location(null, maxX, minY, minZ),
-        Location(null, minX, maxY, maxZ),
-        1.0,
-        object : ParticleSpawner {
-            override fun spawn(location: Location) {
-                vertex.add(Vector(location.x, location.y, location.z))
-            }
-        }
-    ).show()
-    return vertex.toList()
+    return listOf(
+        Vector(minX, minY, minZ),
+        Vector(maxY, minY, minZ),
+        Vector(maxY, minY, maxY),
+        Vector(minX, minY, maxZ),
+        Vector(minX, maxY, minZ),
+        Vector(maxY, maxY, minZ),
+        Vector(maxY, maxY, maxY),
+        Vector(minX, maxY, maxZ),
+    )
 }
 
 val Boolean.display: String

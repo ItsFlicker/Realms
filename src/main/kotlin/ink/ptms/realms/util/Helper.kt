@@ -1,19 +1,12 @@
 package ink.ptms.realms.util
 
-import ink.ptms.realms.Realms
 import org.bukkit.Bukkit
 import org.bukkit.Sound
-import org.bukkit.attribute.Attribute
 import org.bukkit.command.CommandSender
-import org.bukkit.entity.Entity
 import org.bukkit.entity.Player
 import taboolib.common.platform.function.console
 import taboolib.common5.Baffle
-import taboolib.common5.Coerce
 import taboolib.module.chat.colored
-import taboolib.module.nms.getI18nName
-import taboolib.platform.compat.replacePlaceholder
-import java.util.*
 import java.util.concurrent.TimeUnit
 
 /**
@@ -21,33 +14,6 @@ import java.util.concurrent.TimeUnit
  * @Since 2020-01-05 23:19
  */
 interface Helper {
-
-    fun String.toPlayer(): Player? {
-        return player(this)
-    }
-
-    fun Entity.getCName(): String {
-        if (this.customName != null) {
-            return this.customName!!
-        }
-        return this.getI18nName()
-    }
-
-    fun UUID.toPlayer(): Player? {
-        return Bukkit.getPlayer(this)
-    }
-
-    fun String.toPapi(player: Player): String {
-        return this.replacePlaceholder(player)
-    }
-
-    fun List<String>.toPapi(player: Player): List<String> {
-        return this.replacePlaceholder(player)
-    }
-
-    fun Double.toTwo(): Double {
-        return Coerce.format(this)
-    }
 
     fun String.screen(): String {
         return this.replace("[^A-Za-z0-9\\u4e00-\\u9fa5_]".toRegex(), "")
@@ -74,13 +40,6 @@ interface Helper {
 
     fun CommandSender.error(message: String) {
         toError(this, message)
-    }
-
-    fun heal(player: Player) {
-        player.health = player.getAttribute(Attribute.GENERIC_MAX_HEALTH)?.value ?: 20.0
-        player.foodLevel = 20
-        player.fireTicks = 0
-        player.activePotionEffects.forEach { player.removePotionEffect(it.type) }
     }
 
     fun player(name: String): Player? {
@@ -110,14 +69,6 @@ interface Helper {
 
     fun toConsole(message: String) {
         console().sendMessage("§8[§c Realms §8] §7$message".colored())
-    }
-
-    fun run(runnable: () -> (Unit)) {
-        Bukkit.getScheduler().runTask(Realms.plugin, Runnable { runnable.invoke() })
-    }
-
-    fun runAsync(runnable: () -> (Unit)) {
-        Bukkit.getScheduler().runTaskAsynchronously(Realms.plugin, Runnable { runnable.invoke() })
     }
 
     companion object {
