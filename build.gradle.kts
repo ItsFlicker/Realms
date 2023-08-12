@@ -1,8 +1,7 @@
 plugins {
     `java-library`
-    `maven-publish`
     id("io.izzel.taboolib") version "1.56"
-    id("org.jetbrains.kotlin.jvm") version "1.7.21"
+    id("org.jetbrains.kotlin.jvm") version "1.9.0"
 }
 
 taboolib {
@@ -29,7 +28,7 @@ taboolib {
     install("expansion-command-helper")
     install("platform-bukkit")
     classifier = null
-    version = "6.0.10-117"
+    version = "6.0.11-31"
 }
 
 repositories {
@@ -42,8 +41,7 @@ dependencies {
     compileOnly("ink.ptms.core:v11900:11900:mapped")
     compileOnly("ink.ptms.core:v11900:11900:universal")
 
-    compileOnly("ink.ptms.adyeshach:all:2.0.0-snapshot-10")
-
+    compileOnly("ink.ptms.adyeshach:all:2.0.0-snapshot-25")
     compileOnly(kotlin("stdlib"))
     compileOnly(fileTree("libs"))
 }
