@@ -1,3 +1,12 @@
+database:
+  enable: true
+  host: localhost
+  port: 3306
+  database: realms
+  user: root
+  password: 778899ww
+  table: realm_block_data
+
 realms-dust:
   material: blue_dye
   name: '§b领域之尘'

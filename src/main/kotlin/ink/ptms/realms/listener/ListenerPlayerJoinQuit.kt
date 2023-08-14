@@ -17,7 +17,7 @@ object ListenerPlayerJoinQuit {
         disconnect(e.player)
     }
 
-    @SubscribeEvent
+    @SubscribeEvent(ignoreCancelled = true)
     fun onKick(e: PlayerKickEvent) {
         disconnect(e.player)
     }

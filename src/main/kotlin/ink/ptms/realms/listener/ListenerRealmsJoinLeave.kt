@@ -6,6 +6,8 @@ import ink.ptms.realms.event.RealmsLeaveEvent
 import org.bukkit.event.player.PlayerMoveEvent
 import org.bukkit.event.player.PlayerTeleportEvent
 import taboolib.common.platform.event.SubscribeEvent
+import taboolib.common.platform.function.adaptPlayer
+import taboolib.common.platform.function.submitAsync
 
 object ListenerRealmsJoinLeave {
 
@@ -37,6 +39,26 @@ object ListenerRealmsJoinLeave {
                 e.isCancelled = true
             }
         }
+    }
+
+    @SubscribeEvent
+    fun onJoinEvent(event: RealmsJoinEvent) {
+        val realm = event.realmBlock ?: return
+        submitAsync {
+            realm.particleDisplay()
+        }
+        val message = realm.joinMessage.ifEmpty { return }.split(" | ")
+        adaptPlayer(event.player).sendTitle(message[0], message[1], 15, 20, 15)
+    }
+
+    @SubscribeEvent
+    fun onLeaveEvent(event: RealmsLeaveEvent) {
+        val realm = event.realmBlock ?: return
+        submitAsync {
+            realm.particleDisplay()
+        }
+        val message = realm.leaveMessage.ifEmpty { return }.split(" | ")
+        adaptPlayer(event.player).sendTitle(message[0], message[1], 15, 20, 15)
     }
 
 }

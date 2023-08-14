@@ -1,14 +1,13 @@
 package ink.ptms.realms
 
-import com.google.gson.JsonParser
 import ink.ptms.adyeshach.core.Adyeshach
+import ink.ptms.realms.data.Position.Companion.toPosition
 import ink.ptms.realms.data.RealmBlock
 import ink.ptms.realms.data.RealmWorld
-import ink.ptms.realms.event.RealmsJoinEvent
-import ink.ptms.realms.event.RealmsLeaveEvent
+import ink.ptms.realms.database.RealmDatabase
+import ink.ptms.realms.lib.redlib.event.DataBlockDestroyEvent
+import ink.ptms.realms.lib.redlib.getDataContainer
 import ink.ptms.realms.permission.Permission
-import ink.ptms.realms.redlib.event.DataBlockDestroyEvent
-import ink.ptms.realms.redlib.getDataContainer
 import ink.ptms.realms.util.Helper
 import ink.ptms.realms.util.toAABB
 import org.bukkit.*
@@ -18,28 +17,19 @@ import org.bukkit.event.block.Action
 import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.event.player.PlayerInteractEvent
-import org.bukkit.event.world.ChunkLoadEvent
-import org.bukkit.event.world.ChunkUnloadEvent
 import org.bukkit.inventory.ItemStack
-import org.bukkit.persistence.PersistentDataType
 import taboolib.common.LifeCycle
 import taboolib.common.platform.Awake
 import taboolib.common.platform.ProxyParticle
 import taboolib.common.platform.Schedule
 import taboolib.common.platform.event.EventPriority
 import taboolib.common.platform.event.SubscribeEvent
-import taboolib.common.platform.function.adaptPlayer
 import taboolib.common.platform.function.submitAsync
 import taboolib.common.platform.sendTo
 import taboolib.common.util.Vector
-import taboolib.common.util.unsafeLazy
 import taboolib.common5.Coerce
 import taboolib.library.xseries.XMaterial
 import taboolib.module.chat.colored
-import taboolib.module.configuration.Type
-import taboolib.module.configuration.createLocal
-import taboolib.module.configuration.util.getLocation
-import taboolib.module.configuration.util.setLocation
 import taboolib.module.nms.ItemTagData
 import taboolib.module.nms.getItemTag
 import taboolib.module.nms.inputSign
@@ -59,18 +49,14 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object RealmManager : Helper {
 
-    val storage by unsafeLazy { createLocal("storage.json", type = Type.JSON) }
     private val registeredPermissions = ArrayList<Permission>()
     private val worlds = ConcurrentHashMap<String, RealmWorld>()
+    val realms get() = worlds.values.flatMap { it.realms }
 
     @Awake(LifeCycle.ENABLE)
     fun init() {
-        storage
-        Bukkit.getWorlds().forEach {
-            val realmWorld = it.realmWorld()
-            it.loadedChunks.forEach { chunk ->
-                realmWorld.realms[chunk.chunkKey] = chunk.realms().toMutableList()
-            }
+        RealmDatabase.getAll().forEach {
+            it.center.world.realmWorld().realms += it
         }
     }
 
@@ -81,7 +67,7 @@ object RealmManager : Helper {
                 ProxyParticle.DOLPHIN.sendTo(realm.center.toCenterLocation().toProxyLocation(), 50.0, Vector(0.5, 0.5, 0.5), 5)
 
                 realm.extends.forEach { (location, _) ->
-                    ProxyParticle.REDSTONE.sendTo(location.toCenterLocation().toProxyLocation(), 50.0, Vector(0.5, 0.5, 0.5), 5, data = ProxyParticle.DustData(Color(152, 249, 255), 1f))
+                    ProxyParticle.REDSTONE.sendTo(location.toCenter().toProxyLocation(), 50.0, Vector(0.5, 0.5, 0.5), 5, data = ProxyParticle.DustData(Color(152, 249, 255), 1f))
                 }
                 if (realm.hasPermission("particle", def = false)) {
                     realm.particleDisplay()
@@ -92,30 +78,14 @@ object RealmManager : Helper {
     }
 
     @SubscribeEvent
-    fun e(e: ChunkLoadEvent) {
-        val realmWorld = e.chunk.world.realmWorld()
-        if (!realmWorld.realms.containsKey(e.chunk.chunkKey)) {
-            realmWorld.realms[e.chunk.chunkKey] = e.chunk.realms().toMutableList()
-        }
-    }
-
-    @SubscribeEvent
-    fun e(e: ChunkUnloadEvent) {
-        val realmWorld = e.chunk.world.realmWorld()
-        if (realmWorld.realms.containsKey(e.chunk.chunkKey)) {
-            realmWorld.realms.remove(e.chunk.chunkKey)
-        }
-    }
-
-    @SubscribeEvent
-    fun e(e: DataBlockDestroyEvent) {
+    fun onBreak(e: DataBlockDestroyEvent) {
         if (e.cause != DataBlockDestroyEvent.DestroyCause.PLAYER_BREAK) {
             e.isCancelled = true
         }
     }
 
     @SubscribeEvent
-    fun e(e: PlayerInteractEvent) {
+    fun onInteract(e: PlayerInteractEvent) {
         if (e.action == Action.RIGHT_CLICK_BLOCK && e.clickedBlock!!.isRealmBlock()) {
             e.isCancelled = true
             val realmBlock = e.clickedBlock!!.getRealmBlock()!!
@@ -128,7 +98,7 @@ object RealmManager : Helper {
     }
 
     @SubscribeEvent
-    fun e(e: BlockBreakEvent) {
+    fun onPlayerBreak(e: BlockBreakEvent) {
         if (e.block.isRealmBlock()) {
             e.isCancelled = true
             val realmBlock = e.block.getRealmBlock()!!
@@ -149,11 +119,11 @@ object RealmManager : Helper {
                     }
                 }
                 // 破坏扩展
-                else if (realmBlock.extends.containsKey(e.block.location)) {
+                else if (realmBlock.extends.containsKey(e.block.location.toPosition())) {
                     e.block.world.playEffect(e.block.location.toCenterLocation(), Effect.STEP_SOUND, e.block.type)
                     e.block.type = Material.AIR
                     e.block.world.dropItemNaturally(e.block.location.toCenterLocation(), Realms.realmsDust.also {
-                        it.amount = realmBlock.extends.remove(e.block.location)!!
+                        it.amount = realmBlock.extends.remove(e.block.location.toPosition())!!
                     })
                     e.player.sendHolographic(e.block.location.toCenterLocation(), "§c:(", "§7子领域已移除.")
                     realmBlock.update()
@@ -166,21 +136,21 @@ object RealmManager : Helper {
     }
 
     @SubscribeEvent(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    fun e(e: BlockPlaceEvent) {
+    fun onPlace(e: BlockPlaceEvent) {
         val realmSize = e.itemInHand.getRealmSize()
         if (realmSize > 0) {
             val aabb = e.block.location.toCenterLocation().toAABB(realmSize)
             val realms = e.block.location.world.realms().filter { it.intersect(aabb) }
             when {
                 realms.isEmpty() -> {
-                    val exist = storage.getKeys(false)
+                    val exist = worlds.values.map { world -> world.realms.map { realm -> realm.name } }.flatten()
                     var name = e.player.name
                     var i = 2
                     while (name in exist) {
                         name = e.player.name + i.toString()
                         i++
                     }
-                    RealmBlock(e.block.location, realmSize, name).create(e.player)
+                    RealmBlock(e.block.location, e.player.uniqueId, realmSize, name).create(e.player)
                     e.block.getDataContainer()!!["realms"] = true
                     e.player.playSound(e.player.location, Sound.BLOCK_ENCHANTMENT_TABLE_USE, 1f, 1f)
                     e.player.sendHolographic(e.block.location.toCenterLocation().add(0.0, 1.0, 0.0), "§e:)", "§f领域已创建")
@@ -232,12 +202,12 @@ object RealmManager : Helper {
                                 return@onClick
                             }
                             // 合并新建领域
-                            select.extends[e.block.location] = realmSize
+                            select.extends[e.block.location.toPosition()] = realmSize
                             // 合并其他领域
                             verify.forEach {
                                 if (it != select) {
                                     it.remove()
-                                    select.extends[it.center] = it.size
+                                    select.extends[it.center.toPosition()] = it.size
                                     select.extends.putAll(it.extends)
                                 }
                             }
@@ -287,7 +257,7 @@ object RealmManager : Helper {
     }
 
     fun Block.getRealmBlock(): RealmBlock? {
-        return world.realms().firstOrNull { it.center == location || it.extends.any { p -> p.key == location } }
+        return world.realms().firstOrNull { it.center == location || it.extends.any { p -> p.key == location.toPosition() } }
     }
 
     fun ItemStack.getRealmSize(): Int {
@@ -301,7 +271,7 @@ object RealmManager : Helper {
     }
 
     fun World.realms(): List<RealmBlock> {
-        return realmWorld().realms.values.flatten()
+        return realmWorld().realms
     }
 
     fun World.realmWorld(): RealmWorld {
@@ -309,9 +279,8 @@ object RealmManager : Helper {
     }
 
     fun RealmBlock.create(player: Player) {
-        owner = player.name
         users.computeIfAbsent(player.name) { HashMap() }["admin"] = true
-        center.world.realmWorld().realms.computeIfAbsent(center.chunk.chunkKey) { ArrayList() }.add(this)
+        center.world.realmWorld().realms += this
         this@RealmManager.registeredPermissions.forEach {
             permissions[it.id] = it.default
         }
@@ -319,16 +288,12 @@ object RealmManager : Helper {
     }
 
     fun RealmBlock.save() {
-        center.chunk.persistentDataContainer.set(NamespacedKey(bukkitPlugin, node), PersistentDataType.STRING, json)
-        storage["$name.owner"] = owner
-        storage.setLocation("$name.location", center.toProxyLocation())
-        storage.setLocation("$name.tploc", tploc.toProxyLocation())
+        RealmDatabase.update(this)
     }
 
     fun RealmBlock.remove() {
-        center.world.realmWorld().realms[center.chunk.chunkKey]?.remove(this)
-        center.chunk.persistentDataContainer.remove(NamespacedKey(bukkitPlugin, node))
-        storage[name] = null
+        center.world.realmWorld().realms -= this
+        RealmDatabase.delete(this)
     }
 
     fun RealmBlock.getAdmins(): List<String> {
@@ -347,12 +312,11 @@ object RealmManager : Helper {
                 player.closeInventory()
                 return@inputSign
             }
-            if (names in storage.getKeys(false)) {
+            if (worlds.values.any { world -> names in world.realms.map { realm -> realm.name } }) {
                 player.error("领域名与其他领域冲突!")
                 player.closeInventory()
                 return@inputSign
             }
-            storage[name] = null
             name = names
             player.info("当前领域名称更改为了 &f$names")
             openSettings(player)
@@ -367,7 +331,7 @@ object RealmManager : Helper {
             } else {
                 "${it[0]} | ${it[1]}".colored()
             }
-            joinTell = info
+            joinMessage = info
             player.info("变更成功")
             openSettings(player)
             save()
@@ -381,7 +345,7 @@ object RealmManager : Helper {
             } else {
                 "${it[0]} | ${it[1]}".colored()
             }
-            leaveTell = info
+            leaveMessage = info
             player.info("变更成功")
             openSettings(player)
             save()
@@ -434,7 +398,7 @@ object RealmManager : Helper {
             set('1', buildItem(XMaterial.NAME_TAG) {
                 name = "§f进入提示"
                 lore.addAll(listOf(
-                    "§7当前提示: §f${joinTell}",
+                    "§7当前提示: §f${joinMessage}",
                     "",
                     "§7点击编辑:",
                     "§8进入领地时的提示"
@@ -443,7 +407,7 @@ object RealmManager : Helper {
             set('2', buildItem(XMaterial.NAME_TAG) {
                 name = "§f离开提示"
                 lore.addAll(listOf(
-                    "§7当前提示: §f${leaveTell}",
+                    "§7当前提示: §f${leaveMessage}",
                     "",
                     "§7点击编辑:",
                     "§8离开领地时的提示"
@@ -582,57 +546,6 @@ object RealmManager : Helper {
                 element.generateMenuItem(hasPermission(element.id, player = user, def = element.default))
             }
         }
-    }
-
-    fun Chunk.realms() = persistentDataContainer.keys.filter { it.key.startsWith("realm_") }.map { realm ->
-        val position = realm.key.substring("realm_".length).split("_")
-        val json = JsonParser().parse(persistentDataContainer[realm, PersistentDataType.STRING]).asJsonObject
-        RealmBlock(position.toLocation(world), json["size"].asInt, json["name"].asString).also { realmBlock ->
-            json["permissions"].asJsonObject.entrySet().forEach { (k, v) ->
-                realmBlock.permissions[k] = v.asBoolean
-            }
-            json["users"].asJsonObject.entrySet().forEach { (k, v) ->
-                realmBlock.users[k] = v.asJsonObject.entrySet().map { it.key to it.value.asBoolean }.toMap(HashMap())
-            }
-            json["extends"].asJsonObject.entrySet().forEach { (k, v) ->
-                realmBlock.extends[k.split(",").toLocation(world)] = v.asInt
-            }
-            json["owner"]?.asString?.also { value ->
-                realmBlock.owner = value
-            }
-            json["joinTell"].asString.also { value ->
-                realmBlock.joinTell = value
-            }
-            json["leaveTell"].asString.also { value ->
-                realmBlock.leaveTell = value
-            }
-            storage.getConfigurationSection(json["name"].asString)?.getLocation("tploc")?.toBukkitLocation()?.let { realmBlock.tploc = it }
-            realmBlock.update()
-        }
-    }
-
-    private fun List<String>.toLocation(world: World): Location {
-        return Location(world, Coerce.toDouble(this[0]), Coerce.toDouble(this[1]), Coerce.toDouble(this[2]))
-    }
-
-    @SubscribeEvent
-    fun onJoinEvent(event: RealmsJoinEvent) {
-        val realm = event.realmBlock ?: return
-        submitAsync {
-            realm.particleDisplay()
-        }
-        val message = realm.joinTell.ifEmpty { return }.split(" | ")
-        adaptPlayer(event.player).sendTitle(message[0], message[1], 15, 20, 15)
-    }
-
-    @SubscribeEvent
-    fun onLeaveEvent(event: RealmsLeaveEvent) {
-        val realm = event.realmBlock ?: return
-        submitAsync {
-            realm.particleDisplay()
-        }
-        val message = realm.leaveTell.ifEmpty { return }.split(" | ")
-        adaptPlayer(event.player).sendTitle(message[0], message[1], 15, 20, 15)
     }
 
     private fun Player.sendHolographic(location: Location, vararg message: String) {

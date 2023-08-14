@@ -1,5 +1,6 @@
 package ink.ptms.realms.util
 
+import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.entity.Player
 import taboolib.common.platform.function.adaptPlayer
@@ -14,6 +15,21 @@ fun Location.toAABB(size: Int) = BoundingBox(
     y + size + 1.5,
     z + size + 1.5
 )
+
+fun toLocation(source: String): Location {
+    return source.replace("__", ".").split(",").run {
+        Location(
+            Bukkit.getWorld(get(0)),
+            getOrElse(1) { "0" }.toDouble(),
+            getOrElse(2) { "0" }.toDouble(),
+            getOrElse(3) { "0" }.toDouble()
+        )
+    }
+}
+
+fun fromLocation(location: Location): String {
+    return "${location.world?.name},${location.x},${location.y},${location.z}".replace(".", "__")
+}
 
 fun BoundingBox.getVertex(): List<Vector> {
     return listOf(

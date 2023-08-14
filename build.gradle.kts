@@ -19,29 +19,36 @@ taboolib {
     install(
         "module-chat",
         "module-configuration",
+        "module-database",
         "module-effect",
         "module-navigation",
         "module-nms",
         "module-nms-util",
         "module-ui"
     )
-    install("expansion-command-helper")
+    install(
+        "expansion-command-helper",
+        "expansion-persistent-container-object"
+    )
     install("platform-bukkit")
+    relocate("com.alibaba.fastjson2","ink.ptms.realms.lib.fastjson2")
     classifier = null
-    version = "6.0.11-31"
+    version = "6.0.12-local"
 }
 
 repositories {
+    mavenLocal()
     mavenCentral()
     maven("https://jitpack.io")
 }
 
 dependencies {
     compileOnly("ink.ptms.core:v11604:11604")
-    compileOnly("ink.ptms.core:v11900:11900:mapped")
-    compileOnly("ink.ptms.core:v11900:11900:universal")
+    compileOnly("ink.ptms.core:v12000:12000:mapped")
+    compileOnly("ink.ptms.core:v12000:12000:universal")
 
     compileOnly("ink.ptms.adyeshach:all:2.0.0-snapshot-25")
+    taboo("com.alibaba.fastjson2:fastjson2-kotlin:2.0.39-SNAPSHOT")
     compileOnly(kotlin("stdlib"))
     compileOnly(fileTree("libs"))
 }

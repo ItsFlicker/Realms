@@ -1,17 +1,18 @@
 package ink.ptms.realms.data
 
-import com.google.gson.JsonObject
 import ink.ptms.realms.util.toAABB
 import org.bukkit.Location
 import taboolib.common.platform.ProxyParticle
 import taboolib.common.platform.sendTo
 import taboolib.common.util.Vector
+import taboolib.expansion.Id
 import taboolib.module.effect.ParticleSpawner
 import taboolib.module.effect.shape.Cube
 import taboolib.module.effect.shape.Line
 import taboolib.module.navigation.BoundingBox
 import taboolib.platform.util.toProxyLocation
 import java.awt.Color
+import java.util.*
 
 /**
  * Realms
@@ -20,55 +21,24 @@ import java.awt.Color
  * @author sky
  * @since 2021/3/11 5:09 下午
  */
-class RealmBlock(center: Location, var size: Int, var name: String) {
+class RealmBlock(
+    @Id
+    val center: Location,
+    val owner: UUID,
+    val size: Int,
+    var name: String,
+    var joinMessage: String = "§e+ §f$name | 欢迎",
+    var leaveMessage: String = "§e- §f$name | 慢走",
+    var permissions: MutableMap<String, Boolean> = mutableMapOf(),
+    var users: MutableMap<String, MutableMap<String, Boolean>> = mutableMapOf(),
+    var extends: MutableMap<Position, Int> = mutableMapOf(),
+    var teleportLocation: Location = center.clone().add(0.0, 1.0, 0.0)
+) {
 
-    val center = center
-        get() = field.clone()
-
-    var tploc = this.center.add(0.0, 1.0, 0.0)
-        get() = field.clone()
-
-    val permissions = HashMap<String, Boolean>()
-
-    val users = HashMap<String, MutableMap<String, Boolean>>()
-
-    val extends = HashMap<Location, Int>()
     val aabb = ArrayList<BoundingBox>()
-
-    var owner: String = name
-    var joinTell: String = "§e+ §f$name | 欢迎"
-    var leaveTell: String = "§e- §f$name | 慢走"
 
     val node: String
         get() = "realm_${center.blockX}_${center.blockY}_${center.blockZ}"
-
-    val json: String
-        get() = JsonObject().also { json ->
-            json.addProperty("size", size)
-            json.add("permissions", JsonObject().also { perm ->
-                permissions.forEach {
-                    perm.addProperty(it.key, it.value)
-                }
-            })
-            json.add("users", JsonObject().also { user ->
-                users.forEach {
-                    user.add(it.key, JsonObject().also { u ->
-                        it.value.forEach { (k, v) ->
-                            u.addProperty(k, v)
-                        }
-                    })
-                }
-            })
-            json.add("extends", JsonObject().also { ext ->
-                extends.forEach {
-                    ext.addProperty("${it.key.x},${it.key.y},${it.key.z}", it.value)
-                }
-            })
-            json.addProperty("name", name)
-            json.addProperty("owner", owner)
-            json.addProperty("joinTell", joinTell)
-            json.addProperty("leaveTell", leaveTell)
-        }.toString()
 
     init {
         update()
@@ -91,7 +61,7 @@ class RealmBlock(center: Location, var size: Int, var name: String) {
     fun update() {
         aabb.clear()
         aabb.add(center.toCenterLocation().toAABB(size))
-        aabb.addAll(extends.map { it.key.toCenterLocation().toAABB(it.value) })
+        aabb.addAll(extends.map { it.key.toCenter().toBukkitLocation().toAABB(it.value) })
     }
 
     /**
@@ -131,7 +101,7 @@ class RealmBlock(center: Location, var size: Int, var name: String) {
         extends.forEach { (location, _) ->
             Line(
                 center.toCenterLocation().toProxyLocation(),
-                location.toCenterLocation().toProxyLocation(),
+                location.toCenter().toProxyLocation(),
                 0.5,
                 object : ParticleSpawner {
                     override fun spawn(location: taboolib.common.util.Location) {
@@ -159,6 +129,6 @@ class RealmBlock(center: Location, var size: Int, var name: String) {
     }
 
     override fun toString(): String {
-        return "RealmBlock(size=$size, name=$name, permissions=$permissions, users=$users, extends=$extends, node='$node')"
+        return "RealmBlock(owner=$owner, size=$size, name=$name, permissions=$permissions, users=$users, extends=$extends, node='$node')"
     }
 }

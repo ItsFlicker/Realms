@@ -1,7 +1,5 @@
 package ink.ptms.realms.data
 
-import java.util.concurrent.ConcurrentHashMap
-
 /**
  * Realms
  * ink.ptms.realms.data.RealmWorld
@@ -11,5 +9,5 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class RealmWorld {
 
-    val realms = ConcurrentHashMap<Long, MutableList<RealmBlock>>()
+    val realms = mutableListOf<RealmBlock>()
 }

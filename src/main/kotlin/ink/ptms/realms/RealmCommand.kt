@@ -4,22 +4,16 @@ import ink.ptms.realms.RealmManager.done
 import ink.ptms.realms.RealmManager.error
 import ink.ptms.realms.RealmManager.getRealm
 import ink.ptms.realms.RealmManager.getRealmSize
-import ink.ptms.realms.RealmManager.info
 import ink.ptms.realms.RealmManager.isAdmin
 import ink.ptms.realms.RealmManager.save
 import ink.ptms.realms.RealmManager.setRealmSize
-import ink.ptms.realms.util.warning
 import org.bukkit.entity.Player
 import org.bukkit.event.player.PlayerTeleportEvent
 import taboolib.common.platform.command.*
 import taboolib.common.platform.function.submitAsync
 import taboolib.common5.Coerce
 import taboolib.expansion.createHelper
-import taboolib.module.configuration.util.asMap
-import taboolib.module.configuration.util.getLocation
-import taboolib.module.configuration.util.mapSection
 import taboolib.platform.util.isAir
-import taboolib.platform.util.toBukkitLocation
 
 /**
  * Realms
@@ -31,7 +25,12 @@ import taboolib.platform.util.toBukkitLocation
 @CommandHeader("realm", ["res"], permissionDefault = PermissionDefault.TRUE)
 object RealmCommand {
 
-    @CommandBody(permission = "admin", optional = true)
+    @CommandBody
+    val main = mainCommand {
+        createHelper()
+    }
+
+    @CommandBody(permission = "realms.admin", optional = true)
     val setrealmsize = subCommand {
         dynamic {
             restrict<Player> { _, _, argument ->
@@ -60,21 +59,16 @@ object RealmCommand {
     val tp = subCommand {
         dynamic("realm") {
             suggestion<Player>(uncheck = true) { sender, _ ->
-                RealmManager.storage
-                    .mapSection { it.getString("owner", "")!! }
-                    .filterValues { sender.name == it }.keys.toList()
+                RealmManager.realms.filter { sender.uniqueId == it.owner }.map { it.name }
             }
             execute<Player> { sender, ctx, _ ->
-                val info = RealmManager.storage.getConfigurationSection(ctx["realm"]) ?: return@execute sender.error("未知的领域")
-                val location = info.getLocation("location")!!.toBukkitLocation()
-                val tploc = info.getLocation("tploc")!!.toBukkitLocation()
-                location.world.getChunkAt(location)
-                val realm = location.getRealm() ?: return@execute sender.error("无法传送: 内部错误")
+                val realm = RealmManager.realms.firstOrNull { it.name == ctx["realm"] }
+                    ?: return@execute sender.error("未知的领域")
                 if (realm.isAdmin(sender) || realm.hasPermission("teleport", sender.name)) {
-                    sender.teleport(tploc, PlayerTeleportEvent.TeleportCause.PLUGIN)
+                    sender.teleport(realm.teleportLocation, PlayerTeleportEvent.TeleportCause.PLUGIN)
                     sender.done("传送成功")
                 } else {
-                    sender.warning()
+                    sender.error("你没有该领域的传送权限")
                 }
             }
         }
@@ -85,17 +79,12 @@ object RealmCommand {
         execute<Player> { sender, _, _ ->
             val realm = sender.location.getRealm() ?: return@execute sender.error("无效的领域")
             if (realm.isAdmin(sender)) {
-                realm.tploc = sender.location
+                realm.teleportLocation = sender.location
                 realm.save()
                 sender.done("传送点已设置为你的位置")
             } else {
-                sender.error("你没有权限")
+                sender.error("你没有该领域的管理权限")
             }
         }
-    }
-
-    @CommandBody
-    val main = mainCommand {
-        createHelper()
     }
 }
