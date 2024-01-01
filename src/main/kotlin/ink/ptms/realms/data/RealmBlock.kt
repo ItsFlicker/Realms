@@ -1,17 +1,23 @@
 package ink.ptms.realms.data
 
 import ink.ptms.realms.util.toAABB
+import org.bukkit.Color
 import org.bukkit.Location
-import taboolib.common.platform.ProxyParticle
-import taboolib.common.platform.sendTo
-import taboolib.common.util.Vector
+import org.bukkit.Particle
+import org.bukkit.Particle.DustOptions
+import org.bukkit.util.Vector
 import taboolib.expansion.Id
+import taboolib.expansion.Key
+import taboolib.expansion.Length
 import taboolib.module.effect.ParticleSpawner
 import taboolib.module.effect.shape.Cube
 import taboolib.module.effect.shape.Line
 import taboolib.module.navigation.BoundingBox
+import taboolib.module.nms.createPacket
+import taboolib.module.nms.sendBundlePacket
+import taboolib.platform.util.onlinePlayers
+import taboolib.platform.util.toBukkitLocation
 import taboolib.platform.util.toProxyLocation
-import java.awt.Color
 import java.util.*
 
 /**
@@ -24,14 +30,20 @@ import java.util.*
 class RealmBlock(
     @Id
     val center: Location,
+    @Key
+    @Length(32)
+    val serverName: String,
     val owner: UUID,
     val size: Int,
+    @Length(32)
     var name: String,
+    @Length(64)
     var joinMessage: String = "§e+ §f$name | 欢迎",
+    @Length(64)
     var leaveMessage: String = "§e- §f$name | 慢走",
     var permissions: MutableMap<String, Boolean> = mutableMapOf(),
     var users: MutableMap<String, MutableMap<String, Boolean>> = mutableMapOf(),
-    var extends: MutableMap<Position, Int> = mutableMapOf(),
+    var extend: MutableMap<Position, Int> = mutableMapOf(),
     var teleportLocation: Location = center.clone().add(0.0, 1.0, 0.0)
 ) {
 
@@ -61,7 +73,7 @@ class RealmBlock(
     fun update() {
         aabb.clear()
         aabb.add(center.toCenterLocation().toAABB(size))
-        aabb.addAll(extends.map { it.key.toCenter().toBukkitLocation().toAABB(it.value) })
+        aabb.addAll(extend.map { it.key.toCenter().toBukkitLocation().toAABB(it.value) })
     }
 
     /**
@@ -87,6 +99,7 @@ class RealmBlock(
      * 展示领地边界和子领域连接
      */
     fun particleDisplay() {
+        val packets = mutableListOf<Any>()
         aabb.forEach { box ->
             Cube(
                 Location(center.world, box.minX, box.minY, box.minZ).toProxyLocation(),
@@ -94,22 +107,33 @@ class RealmBlock(
                 1.0,
                 object : ParticleSpawner {
                     override fun spawn(location: taboolib.common.util.Location) {
-                        ProxyParticle.END_ROD.sendTo(location, range = 100.0, offset = Vector(0, 0, 0), count = 1)
+                        packets += Particle.END_ROD.createPacket(
+                            location.toBukkitLocation(),
+                            offset = Vector(0, 0, 0),
+                            count = 1
+                        )
                     }
             }).show()
         }
-        extends.forEach { (location, _) ->
+        extend.forEach { (location, _) ->
             Line(
                 center.toCenterLocation().toProxyLocation(),
                 location.toCenter().toProxyLocation(),
                 0.5,
                 object : ParticleSpawner {
                     override fun spawn(location: taboolib.common.util.Location) {
-                        ProxyParticle.REDSTONE.sendTo(location, 50.0, Vector(0, 0, 0), 5, data = ProxyParticle.DustData(
-                            Color(152, 249, 255), 1f))
+                        packets += Particle.REDSTONE.createPacket(
+                            location.toBukkitLocation(),
+                            offset = Vector(0, 0, 0),
+                            count = 5,
+                            data = DustOptions(Color.fromRGB(152, 249, 255), 1f)
+                        )
                     }
                 }
             ).show()
+        }
+        onlinePlayers.filter { it.world == center.world && it.location.distance(center) <= 128 }.forEach {
+            it.sendBundlePacket(packets)
         }
     }
 
@@ -129,6 +153,6 @@ class RealmBlock(
     }
 
     override fun toString(): String {
-        return "RealmBlock(owner=$owner, size=$size, name=$name, permissions=$permissions, users=$users, extends=$extends, node='$node')"
+        return "RealmBlock(owner=$owner, size=$size, name=$name, permissions=$permissions, users=$users, extends=$extend, node='$node')"
     }
 }

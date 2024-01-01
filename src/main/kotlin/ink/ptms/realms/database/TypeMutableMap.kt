@@ -13,9 +13,9 @@ object TypeMutableMap : CustomType {
 
     override val typeSQLite: ColumnTypeSQLite = ColumnTypeSQLite.TEXT
 
-    override val typeSQL: ColumnTypeSQL = ColumnTypeSQL.VARCHAR
+    override val typeSQL: ColumnTypeSQL = ColumnTypeSQL.TEXT
 
-    override val length: Int = 2048
+    override val length: Int = 0
 
     override fun serialize(value: Any): Any {
         return JSON.toJSONString(value)

@@ -13,6 +13,8 @@ taboolib {
         }
         dependencies {
             name("Adyeshach")
+            name("HuskHomes")
+            name("HuskTowns").optional(true)
         }
     }
     install("common", "common-5")
@@ -44,10 +46,12 @@ repositories {
 
 dependencies {
     compileOnly("ink.ptms.core:v11604:11604")
-    compileOnly("ink.ptms.core:v12000:12000:mapped")
-    compileOnly("ink.ptms.core:v12000:12000:universal")
+    compileOnly("ink.ptms.core:v12004:12004:mapped")
+    compileOnly("ink.ptms.core:v12004:12004:universal")
 
     compileOnly("ink.ptms.adyeshach:all:2.0.0-snapshot-25")
+    compileOnly("net.william278:huskhomes:4.5.5")
+    compileOnly("net.william278:husktowns:2.6.1")
     taboo("com.alibaba.fastjson2:fastjson2-kotlin:2.0.39-SNAPSHOT")
     compileOnly(kotlin("stdlib"))
     compileOnly(fileTree("libs"))

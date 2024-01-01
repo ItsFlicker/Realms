@@ -7,10 +7,13 @@ import ink.ptms.realms.RealmManager.getRealmSize
 import ink.ptms.realms.RealmManager.isAdmin
 import ink.ptms.realms.RealmManager.save
 import ink.ptms.realms.RealmManager.setRealmSize
+import ink.ptms.realms.database.RealmDatabase
+import net.william278.huskhomes.api.HuskHomesAPI
+import net.william278.huskhomes.teleport.TeleportationException
 import org.bukkit.entity.Player
-import org.bukkit.event.player.PlayerTeleportEvent
 import taboolib.common.platform.command.*
 import taboolib.common.platform.function.submitAsync
+import taboolib.common.util.unsafeLazy
 import taboolib.common5.Coerce
 import taboolib.expansion.createHelper
 import taboolib.platform.util.isAir
@@ -24,6 +27,10 @@ import taboolib.platform.util.isAir
  */
 @CommandHeader("realm", ["res"], permissionDefault = PermissionDefault.TRUE)
 object RealmCommand {
+
+    val api by unsafeLazy {
+        HuskHomesAPI.getInstance()
+    }
 
     @CommandBody
     val main = mainCommand {
@@ -59,14 +66,23 @@ object RealmCommand {
     val tp = subCommand {
         dynamic("realm") {
             suggestion<Player>(uncheck = true) { sender, _ ->
-                RealmManager.realms.filter { sender.uniqueId == it.owner }.map { it.name }
+                RealmDatabase.getByPlayer(sender).map { it.name }
             }
             execute<Player> { sender, ctx, _ ->
-                val realm = RealmManager.realms.firstOrNull { it.name == ctx["realm"] }
+                val realm = RealmDatabase.getAll().firstOrNull { it.name == ctx["realm"] }
                     ?: return@execute sender.error("未知的领域")
                 if (realm.isAdmin(sender) || realm.hasPermission("teleport", sender.name)) {
-                    sender.teleport(realm.teleportLocation, PlayerTeleportEvent.TeleportCause.PLUGIN)
-                    sender.done("传送成功")
+                    try {
+                        api.teleportBuilder()
+                            .teleporter(api.adaptUser(sender))
+                            .target(api.adaptPosition(realm.teleportLocation, realm.serverName))
+                            .toTimedTeleport()
+                            .execute()
+                    } catch (e: TeleportationException) {
+                        if (sender.isOnline) {
+                            e.displayMessage(api.adaptUser(sender))
+                        }
+                    }
                 } else {
                     sender.error("你没有该领域的传送权限")
                 }
@@ -79,7 +95,7 @@ object RealmCommand {
         execute<Player> { sender, _, _ ->
             val realm = sender.location.getRealm() ?: return@execute sender.error("无效的领域")
             if (realm.isAdmin(sender)) {
-                realm.teleportLocation = sender.location
+                realm.teleportLocation = sender.location.clone()
                 realm.save()
                 sender.done("传送点已设置为你的位置")
             } else {

@@ -5,6 +5,7 @@ import ink.ptms.realms.data.Position.Companion.toPosition
 import ink.ptms.realms.data.RealmBlock
 import ink.ptms.realms.data.RealmWorld
 import ink.ptms.realms.database.RealmDatabase
+import ink.ptms.realms.hook.HookHuskTowns
 import ink.ptms.realms.lib.redlib.event.DataBlockDestroyEvent
 import ink.ptms.realms.lib.redlib.getDataContainer
 import ink.ptms.realms.permission.Permission
@@ -24,6 +25,7 @@ import taboolib.common.platform.ProxyParticle
 import taboolib.common.platform.Schedule
 import taboolib.common.platform.event.EventPriority
 import taboolib.common.platform.event.SubscribeEvent
+import taboolib.common.platform.function.submit
 import taboolib.common.platform.function.submitAsync
 import taboolib.common.platform.sendTo
 import taboolib.common.util.Vector
@@ -55,18 +57,18 @@ object RealmManager : Helper {
 
     @Awake(LifeCycle.ENABLE)
     fun init() {
-        RealmDatabase.getAll().forEach {
+        RealmDatabase.getByServerName(Realms.serverName!!).forEach {
             it.center.world.realmWorld().realms += it
         }
     }
 
-    @Schedule(async = true, period = 40)
+    @Schedule(async = true, period = 30)
     fun particle() {
         Bukkit.getWorlds().forEach {
             it.realms().forEach { realm ->
                 ProxyParticle.DOLPHIN.sendTo(realm.center.toCenterLocation().toProxyLocation(), 50.0, Vector(0.5, 0.5, 0.5), 5)
 
-                realm.extends.forEach { (location, _) ->
+                realm.extend.forEach { (location, _) ->
                     ProxyParticle.REDSTONE.sendTo(location.toCenter().toProxyLocation(), 50.0, Vector(0.5, 0.5, 0.5), 5, data = ProxyParticle.DustData(Color(152, 249, 255), 1f))
                 }
                 if (realm.hasPermission("particle", def = false)) {
@@ -79,7 +81,7 @@ object RealmManager : Helper {
 
     @SubscribeEvent
     fun onBreak(e: DataBlockDestroyEvent) {
-        if (e.cause != DataBlockDestroyEvent.DestroyCause.PLAYER_BREAK) {
+        if (e.dataBlock.getBoolean("realms") && e.cause != DataBlockDestroyEvent.DestroyCause.PLAYER_BREAK) {
             e.isCancelled = true
         }
     }
@@ -97,6 +99,7 @@ object RealmManager : Helper {
         }
     }
 
+
     @SubscribeEvent
     fun onPlayerBreak(e: BlockBreakEvent) {
         if (e.block.isRealmBlock()) {
@@ -106,7 +109,7 @@ object RealmManager : Helper {
                 // 破坏核心
                 if (realmBlock.center == e.block.location) {
                     // 存在扩展
-                    if (realmBlock.extends.isNotEmpty()) {
+                    if (realmBlock.extend.isNotEmpty()) {
                         e.player.sendHolographic(e.block.location.add(0.5, 1.0, 0.5), "§c:(", "§7需要先移除所有子领域.")
                     } else {
                         e.player.sendHolographic(e.block.location.toCenterLocation(), "§c:(", "§7领域已移除.")
@@ -119,11 +122,11 @@ object RealmManager : Helper {
                     }
                 }
                 // 破坏扩展
-                else if (realmBlock.extends.containsKey(e.block.location.toPosition())) {
+                else if (realmBlock.extend.containsKey(e.block.location.toPosition())) {
                     e.block.world.playEffect(e.block.location.toCenterLocation(), Effect.STEP_SOUND, e.block.type)
                     e.block.type = Material.AIR
                     e.block.world.dropItemNaturally(e.block.location.toCenterLocation(), Realms.realmsDust.also {
-                        it.amount = realmBlock.extends.remove(e.block.location.toPosition())!!
+                        it.amount = realmBlock.extend.remove(e.block.location.toPosition())!!
                     })
                     e.player.sendHolographic(e.block.location.toCenterLocation(), "§c:(", "§7子领域已移除.")
                     realmBlock.update()
@@ -138,99 +141,118 @@ object RealmManager : Helper {
     @SubscribeEvent(priority = EventPriority.MONITOR, ignoreCancelled = true)
     fun onPlace(e: BlockPlaceEvent) {
         val realmSize = e.itemInHand.getRealmSize()
-        if (realmSize > 0) {
-            val aabb = e.block.location.toCenterLocation().toAABB(realmSize)
-            val realms = e.block.location.world.realms().filter { it.intersect(aabb) }
-            when {
-                realms.isEmpty() -> {
-                    val exist = worlds.values.map { world -> world.realms.map { realm -> realm.name } }.flatten()
-                    var name = e.player.name
-                    var i = 2
-                    while (name in exist) {
-                        name = e.player.name + i.toString()
-                        i++
+        if (realmSize <= 0) {
+            return
+        }
+        val item = e.itemInHand.clone().also { it.amount = 1 }
+        if (e.player.gameMode == GameMode.SURVIVAL) {
+            e.itemInHand.amount--
+        }
+        e.isCancelled = true
+        val pt = e.blockPlaced.type
+        val pd = e.blockPlaced.blockData.clone()
+        val max = Realms.getPlayerMaxRealm(e.player)
+        if (RealmDatabase.getByPlayer(e.player).size > max) {
+            e.player.error("所持领域数量已达上限.")
+            e.player.giveItem(item)
+            return
+        }
+        if (HookHuskTowns.hasConflict(e.block.location.toCenterLocation())) {
+            e.player.sendHolographic(e.block.location.toCenterLocation(), "§4:(", "§7当前位置与城镇冲突.")
+            e.player.giveItem(item)
+            return
+        }
+        val aabb = e.block.location.toCenterLocation().toAABB(realmSize)
+        val realms = e.block.location.world.realms().filter { it.intersect(aabb) }
+        when {
+            realms.isEmpty() -> {
+                val exist = RealmDatabase.getAll().map { it.name }
+                var name = e.player.name
+                var i = 2
+                while (name in exist) {
+                    name = e.player.name + i.toString()
+                    i++
+                }
+                submit(delay = 4) {
+                    e.block.type = pt
+                    e.block.blockData = pd
+                }
+                RealmBlock(e.block.location, Realms.serverName!!, e.player.uniqueId, realmSize, name).create(e.player)
+                e.block.getDataContainer()!!["realms"] = true
+                e.player.playSound(e.player.location, Sound.BLOCK_ENCHANTMENT_TABLE_USE, 1f, 1f)
+                e.player.sendHolographic(e.block.location.add(0.5, 1.0, 0.5), "§e:)", "§f领域已创建")
+            }
+            realms.any { !it.hasPermission("admin", e.player.name) } -> {
+                e.player.sendHolographic(e.block.location.toCenterLocation(), "§4:(", "§7当前位置与其他领域冲突.")
+                e.player.giveItem(item)
+            }
+            else -> {
+                e.player.giveItem(item)
+                e.player.playSound(e.player.location, Sound.BLOCK_ENCHANTMENT_TABLE_USE, 1f, 1f)
+                // 领地合并界面
+                e.player.openMenu<Linked<RealmBlock>>("领域合并") {
+                    rows(6)
+                    elements { realms }
+                    slots(Slots.CENTER)
+                    setPreviousPage(47) { _, hasPreviousPage ->
+                        if (hasPreviousPage) buildItem(XMaterial.SPECTRAL_ARROW) { name = "§f上一页" }
+                        else buildItem(XMaterial.ARROW) { name = "§8上一页"}
                     }
-                    RealmBlock(e.block.location, e.player.uniqueId, realmSize, name).create(e.player)
-                    e.block.getDataContainer()!!["realms"] = true
-                    e.player.playSound(e.player.location, Sound.BLOCK_ENCHANTMENT_TABLE_USE, 1f, 1f)
-                    e.player.sendHolographic(e.block.location.toCenterLocation().add(0.0, 1.0, 0.0), "§e:)", "§f领域已创建")
-                }
-                realms.any { !it.hasPermission("admin", e.player.name) } -> {
-                    e.isCancelled = true
-                    e.player.sendHolographic(e.block.location.toCenterLocation(), "§4:(", "§7当前位置与其他领域冲突.")
-                }
-                else -> {
-                    val pt = e.blockPlaced.type
-                    val pd = e.blockPlaced.blockData.clone()
-                    e.isCancelled = true
-                    e.player.playSound(e.player.location, Sound.BLOCK_ENCHANTMENT_TABLE_USE, 1f, 1f)
-                    // 领地合并界面
-                    e.player.openMenu<Linked<RealmBlock>>("领域合并") {
-                        rows(6)
-                        elements { realms }
-                        slots(Slots.CENTER)
-                        setPreviousPage(47) { _, hasPreviousPage ->
-                            if (hasPreviousPage) buildItem(XMaterial.SPECTRAL_ARROW) { name = "§f上一页" }
-                            else buildItem(XMaterial.ARROW) { name = "§8上一页"}
-                        }
-                        setNextPage(51) { _, hasNextPage ->
-                            if (hasNextPage) buildItem(XMaterial.SPECTRAL_ARROW) { name = "§f下一页" }
-                            else buildItem(XMaterial.ARROW) { name = "§8下一页"}
-                        }
-                        set(49, buildItem(XMaterial.OAK_SIGN) {
-                            name = "§f领域合并"
-                            lore += listOf("§7当新领域与多个属于你的领域重合时",
-                                "§7将会作为子领域为已选择的领域扩展",
-                                "",
-                                "§4注意!",
-                                "§c其他未选择的领域同时降级为子领域",
-                                "§c多个连续重合的领域只有一个主领域")
-                        })
-                        onClick { _, element ->
-                            val verify = e.block.location.world.realms().filter { it.intersect(aabb) }
-                            // 验证重合领域权限
-                            if (verify.any { !it.hasPermission("admin", e.player.name) }) {
-                                e.player.closeInventory()
-                                e.player.sendHolographic(e.block.location.toCenterLocation(), "§4:(", "§7当前位置与其他领域冲突.")
-                                return@onClick
-                            }
-                            // 验证选取领域
-                            val select = verify.firstOrNull { it == element }
-                            if (select == null) {
-                                e.player.closeInventory()
-                                e.player.sendHolographic(e.block.location.toCenterLocation(), "§4:(", "§7非法操作.")
-                                return@onClick
-                            }
-                            // 合并新建领域
-                            select.extends[e.block.location.toPosition()] = realmSize
-                            // 合并其他领域
-                            verify.forEach {
-                                if (it != select) {
-                                    it.remove()
-                                    select.extends[it.center.toPosition()] = it.size
-                                    select.extends.putAll(it.extends)
-                                }
-                            }
-                            select.save()
-                            select.update()
-                            submitAsync {
-                                select.particleDisplay()
-                            }
-                            if (e.player.gameMode == GameMode.SURVIVAL) {
-                                e.itemInHand.amount--
-                            }
-                            e.block.type = pt
-                            e.block.blockData = pd
-                            e.block.getDataContainer()!!["realms"] = true
+                    setNextPage(51) { _, hasNextPage ->
+                        if (hasNextPage) buildItem(XMaterial.SPECTRAL_ARROW) { name = "§f下一页" }
+                        else buildItem(XMaterial.ARROW) { name = "§8下一页"}
+                    }
+                    set(49, buildItem(XMaterial.OAK_SIGN) {
+                        name = "§f领域合并"
+                        lore += listOf("§7当新领域与多个属于你的领域重合时",
+                            "§7将会作为子领域为已选择的领域扩展",
+                            "",
+                            "§4注意!",
+                            "§c其他未选择的领域同时降级为子领域",
+                            "§c多个连续重合的领域只有一个主领域")
+                    })
+                    onClick { _, element ->
+                        val verify = e.block.location.world.realms().filter { it.intersect(aabb) }
+                        // 验证重合领域权限
+                        if (verify.any { !it.hasPermission("admin", e.player.name) }) {
                             e.player.closeInventory()
-                            e.player.playSound(e.player.location, Sound.BLOCK_ENCHANTMENT_TABLE_USE, 1f, 1f)
-                            e.player.sendHolographic(e.block.location.toCenterLocation().add(0.0, 1.0, 0.0), "§e:)", "§f领域已创建")
+                            e.player.sendHolographic(e.block.location.toCenterLocation(), "§4:(", "§7当前位置与其他领域冲突.")
+                            return@onClick
                         }
-                        onGenerate { player, element, _, _ ->
-                            buildItem(XMaterial.PAPER) {
-                                name = "§f领域 ${element.center.blockX},${element.center.blockY},${element.center.blockZ}"
-                                lore += listOf("§7距离你 §e${Coerce.format(player.location.distance(element.center))} §7格", "§7点击与其合并")
+                        // 验证选取领域
+                        val select = verify.firstOrNull { it == element }
+                        if (select == null) {
+                            e.player.closeInventory()
+                            e.player.sendHolographic(e.block.location.toCenterLocation(), "§4:(", "§7非法操作.")
+                            return@onClick
+                        }
+                        // 合并新建领域
+                        select.extend[e.block.location.toPosition()] = realmSize
+                        // 合并其他领域
+                        verify.forEach {
+                            if (it != select) {
+                                it.remove()
+                                select.extend[it.center.toPosition()] = it.size
+                                select.extend.putAll(it.extend)
                             }
+                        }
+                        select.save()
+                        select.update()
+                        submitAsync {
+                            select.particleDisplay()
+                        }
+                        e.player.checkItem(item, 1, true)
+                        e.block.type = pt
+                        e.block.blockData = pd
+                        e.block.getDataContainer()!!["realms"] = true
+                        e.player.closeInventory()
+                        e.player.playSound(e.player.location, Sound.BLOCK_ENCHANTMENT_TABLE_USE, 1f, 1f)
+                        e.player.sendHolographic(e.block.location.add(0.5, 1.0, 0.5), "§e:)", "§f领域已创建")
+                    }
+                    onGenerate { player, element, _, _ ->
+                        buildItem(XMaterial.PAPER) {
+                            name = "§f领域 ${element.center.blockX},${element.center.blockY},${element.center.blockZ}"
+                            lore += listOf("§7距离你 §e${Coerce.format(player.location.distance(element.center))} §7格", "§7点击与其合并")
                         }
                     }
                 }
@@ -257,7 +279,7 @@ object RealmManager : Helper {
     }
 
     fun Block.getRealmBlock(): RealmBlock? {
-        return world.realms().firstOrNull { it.center == location || it.extends.any { p -> p.key == location.toPosition() } }
+        return world.realms().firstOrNull { it.center == location || it.extend.any { p -> p.key == location.toPosition() } }
     }
 
     fun ItemStack.getRealmSize(): Int {
@@ -312,7 +334,7 @@ object RealmManager : Helper {
                 player.closeInventory()
                 return@inputSign
             }
-            if (worlds.values.any { world -> names in world.realms.map { realm -> realm.name } }) {
+            if (RealmDatabase.getAll().any { realm -> realm.name == names }) {
                 player.error("领域名与其他领域冲突!")
                 player.closeInventory()
                 return@inputSign
@@ -362,6 +384,7 @@ object RealmManager : Helper {
                 lore.addAll(listOf(
                     "§7名称: §f${this@open.name}",
                     "§7持有者: §f${this@open.getAdmins().joinToString(",")}",
+                    "§7服务器: §f${this@open.serverName}"
                 ))
             })
             set('1', buildItem(XMaterial.COMMAND_BLOCK) { name = "§f全局权限";lore += "§7将作用于所有玩家" })

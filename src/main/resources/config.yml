@@ -1,10 +1,12 @@
+server-name: 生存一区
+
 database:
-  enable: true
+  enable: false
   host: localhost
   port: 3306
-  database: realms
   user: root
-  password: 778899ww
+  password: root
+  database: minecraft
   table: realm_block_data
 
 realms-dust:
